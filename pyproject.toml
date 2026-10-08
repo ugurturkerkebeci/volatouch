@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "volatouch"
+version = "1.0.0"
+description = "Ultra-low latency mobile air control & wireless trackpad for PC over local Wi-Fi."
+readme = "README.md"
+authors = [
+    { name = "Uğur Türker Kebeci", email = "167927605+ugurturkerkebeci@users.noreply.github.com" }
+]
+license = { text = "MIT" }
+keywords = ["remote-desktop", "trackpad", "air-control", "mouse", "keyboard", "low-latency", "screen-stream", "fastapi", "websockets"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Hardware",
+    "Topic :: Multimedia :: Graphics :: Capture",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.22.0",
+    "websockets>=11.0",
+    "mss>=9.0.0",
+    "opencv-python>=4.8.0",
+    "pynput>=1.7.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/ugurturkerkebeci/volatouch"
+Repository = "https://github.com/ugurturkerkebeci/volatouch"
+Issues = "https://github.com/ugurturkerkebeci/volatouch/issues"
+
+[project.scripts]
+volatouch = "volatouch.cli:main"
+
+[tool.setuptools]
+packages = ["volatouch"]
+
+[tool.setuptools.package-data]
+volatouch = ["web/**/*", "web/*"]

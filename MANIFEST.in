@@ -1,0 +1,4 @@
+include LICENSE
+include README.md
+recursive-include volatouch/web *
+recursive-include assets *
