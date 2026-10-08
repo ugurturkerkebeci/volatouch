@@ -22,17 +22,18 @@
 </p>
 
 <p align="center">
-  <a href="#-quick-start-pypi">⚡ Quick Start</a> •
-  <a href="#-key-features">✨ Features</a> •
-  <a href="#-gesture--touch-cheatsheet">📱 Gestures</a> •
-  <a href="#-architecture">🏗️ Architecture</a> •
-  <a href="#-security--sandbox">🛡️ Security</a> •
-  <a href="#-settings--diagnostics">⚙️ Settings</a> •
-  <a href="#-t%C3%BCrk%C3%A7e-rehber">🇹🇷 Türkçe Rehber</a>
+  <a href="#quick-start">⚡ Quick Start</a> •
+  <a href="#features">✨ Features</a> •
+  <a href="#gestures">📱 Gestures</a> •
+  <a href="#security">🛡️ Security</a> •
+  <a href="#settings">⚙️ Settings</a> •
+  <a href="#from-source">💻 From Source</a> •
+  <a href="#turkce-rehber">🇹🇷 Türkçe Rehber</a>
 </p>
 
 ---
 
+<a id="quick-start"></a>
 ## ⚡ Quick Start (PyPI)
 
 Install and launch Volatouch with a single command from your terminal:
@@ -50,6 +51,7 @@ Open this URL in **Safari** or **Chrome** on your phone (connected to the same W
 
 ---
 
+<a id="features"></a>
 ## ✨ Key Features
 
 - **🚀 Ultra-Low Latency Binary Video Streaming:**
@@ -82,6 +84,7 @@ Open this URL in **Safari** or **Chrome** on your phone (connected to the same W
 
 ---
 
+<a id="gestures"></a>
 ## 📱 Gesture & Touch Cheatsheet
 
 | Gesture / Action | Relative Mode | Direct Mode |
@@ -96,33 +99,7 @@ Open this URL in **Safari** or **Chrome** on your phone (connected to the same W
 
 ---
 
-## 🏗️ Architecture
-
-```mermaid
-flowchart TD
-    subgraph Host ["Desktop Host (Windows)"]
-        MSS["mss (Screen Capture 60 FPS)"] --> BGRA["Direct BGRA Frame (No cvtColor)"]
-        BGRA --> CV2["cv2.imencode (JPEG Compression)"]
-        CV2 --> TIME["Timestamp Header (8-Byte Double)"]
-        TIME --> ASYNC["Zero-Copy Queue (asyncio.Queue)"]
-        ASYNC --> WS_STREAM["/ws/stream (Binary WebSocket)"]
-        
-        WS_INPUT["/ws/input (JSON WebSocket)"] --> CTRL["InputController (pynput)"]
-        CTRL --> OS_INPUT["Windows OS Hardware Emulation"]
-    end
-
-    subgraph Client ["Mobile Client (Browser / PWA)"]
-        WS_STREAM --> BITMAP["createImageBitmap (Worker-like GPU decode)"]
-        BITMAP --> RAF["requestAnimationFrame() -> HTML5 Canvas"]
-        
-        TOUCH["Multi-Touch Engine (Direct & Relative)"] --> WS_INPUT
-        KB["Virtual Keyboard & Sticky Modifiers"] --> WS_INPUT
-        ACTIONS["Floating Island (Click, Hold, Scroll)"] --> WS_INPUT
-    end
-```
-
----
-
+<a id="security"></a>
 ## 🛡️ Security & Sandbox
 
 Volatouch implements defense-in-depth security to protect your workstation on shared Wi-Fi networks:
@@ -135,6 +112,7 @@ Volatouch implements defense-in-depth security to protect your workstation on sh
 
 ---
 
+<a id="settings"></a>
 ## ⚙️ Settings & Diagnostics
 
 Tap the floating gear icon to access:
@@ -146,6 +124,7 @@ Tap the floating gear icon to access:
 
 ---
 
+<a id="from-source"></a>
 ## 💻 Running From Source
 
 If you prefer building and developing Volatouch locally:
@@ -176,6 +155,7 @@ python run.py
 
 ---
 
+<a id="turkce-rehber"></a>
 ## 🇹🇷 Türkçe Rehber
 
 Volatouch, aynı yerel Wi-Fi ağına bağlı bilgisayarınızı mobil cihazınızın web tarayıcısı üzerinden sıfıra yakın gecikmeyle (ultra-low latency) yönetmenizi sağlayan yüksek performanslı bir uzaktan kontrol ve hava trackpad sistemidir.
