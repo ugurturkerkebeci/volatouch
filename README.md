@@ -6,7 +6,7 @@
   <img src="https://raw.githubusercontent.com/ugurturkerkebeci/volatouch/main/assets/logo.jpg" alt="Volatouch Logo" width="120" style="border-radius: 24px;" />
 </p>
 
-<h1 align="center">VOLATOUCH</h1>
+<h1 align="center">VOLATOUCH V1.0.0</h1>
 
 <p align="center">
   <strong>Ultra-Low Latency Mobile Air Control & Wireless Trackpad for PC over Wi-Fi</strong>
