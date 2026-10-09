@@ -1,197 +1,280 @@
-import logging
-from typing import Set, List, Optional
-from pynput.mouse import Button, Controller as MouseController
-from pynput.keyboard import Key, Controller as KeyboardController
+"""
+Volatouch Native Input Controller (Zero-Dependency Windows Hardware Emulation via ctypes)
+"""
 
-logger = logging.getLogger("volatouch.input")
+import ctypes
+from ctypes import wintypes
+import time
+from typing import Set, List, Optional
+
+user32 = ctypes.windll.user32
+
+# Mouse flags
+MOUSEEVENTF_MOVE = 0x0001
+MOUSEEVENTF_LEFTDOWN = 0x0002
+MOUSEEVENTF_LEFTUP = 0x0004
+MOUSEEVENTF_RIGHTDOWN = 0x0008
+MOUSEEVENTF_RIGHTUP = 0x0009
+MOUSEEVENTF_MIDDLEDOWN = 0x0020
+MOUSEEVENTF_MIDDLEUP = 0x0040
+MOUSEEVENTF_WHEEL = 0x0800
+MOUSEEVENTF_ABSOLUTE = 0x8000
+
+# Keyboard flags
+KEYEVENTF_EXTENDEDKEY = 0x0001
+KEYEVENTF_KEYUP = 0x0002
+KEYEVENTF_UNICODE = 0x0004
+
+# Virtual-Key Codes Mapping
+VK_MAPPING = {
+    "enter": 0x0D,
+    "return": 0x0D,
+    "backspace": 0x08,
+    "tab": 0x09,
+    "space": 0x20,
+    "esc": 0x1B,
+    "escape": 0x1B,
+    "delete": 0x2E,
+    "shift": 0x10,
+    "shift_l": 0xA0,
+    "shift_r": 0xA1,
+    "ctrl": 0x11,
+    "ctrl_l": 0xA2,
+    "ctrl_r": 0xA3,
+    "alt": 0x12,
+    "alt_l": 0xA4,
+    "alt_r": 0xA5,
+    "win": 0x5B,
+    "cmd": 0x5B,
+    "super": 0x5B,
+    "up": 0x26,
+    "down": 0x28,
+    "left": 0x25,
+    "right": 0x27,
+    "home": 0x24,
+    "end": 0x23,
+    "page_up": 0x21,
+    "page_down": 0x22,
+    "caps_lock": 0x14,
+    "f1": 0x70,
+    "f2": 0x71,
+    "f3": 0x72,
+    "f4": 0x73,
+    "f5": 0x74,
+    "f6": 0x75,
+    "f7": 0x76,
+    "f8": 0x77,
+    "f9": 0x78,
+    "f10": 0x79,
+    "f11": 0x7A,
+    "f12": 0x7B,
+}
+
+# SendInput C structures for Unicode text typing
+class MOUSEINPUT(ctypes.Structure):
+    _fields_ = [
+        ('dx', wintypes.LONG),
+        ('dy', wintypes.LONG),
+        ('mouseData', wintypes.DWORD),
+        ('dwFlags', wintypes.DWORD),
+        ('time', wintypes.DWORD),
+        ('dwExtraInfo', ctypes.POINTER(wintypes.ULONG))
+    ]
+
+class KEYBDINPUT(ctypes.Structure):
+    _fields_ = [
+        ('wVk', wintypes.WORD),
+        ('wScan', wintypes.WORD),
+        ('dwFlags', wintypes.DWORD),
+        ('time', wintypes.DWORD),
+        ('dwExtraInfo', ctypes.POINTER(wintypes.ULONG))
+    ]
+
+class HARDWAREINPUT(ctypes.Structure):
+    _fields_ = [
+        ('uMsg', wintypes.DWORD),
+        ('wParamL', wintypes.WORD),
+        ('wParamH', wintypes.WORD)
+    ]
+
+class INPUT_UNION(ctypes.Union):
+    _fields_ = [
+        ('mi', MOUSEINPUT),
+        ('ki', KEYBDINPUT),
+        ('hi', HARDWAREINPUT)
+    ]
+
+class INPUT(ctypes.Structure):
+    _fields_ = [
+        ('type', wintypes.DWORD),
+        ('u', INPUT_UNION)
+    ]
+
+user32.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int]
+user32.SendInput.restype = wintypes.UINT
+
 
 class InputController:
+    """Zero-dependency Windows Input Controller using ctypes Win32 APIs."""
+
     def __init__(self):
-        self.mouse = MouseController()
-        self.keyboard = KeyboardController()
-        self._pressed_keys: Set[Key] = set()
-        self._pressed_mouse_buttons: Set[Button] = set()
-        
-        # Fractional delta accumulators for smooth micro-movements
+        self._pressed_keys: Set[int] = set()
+        self._pressed_buttons: Set[str] = set()
         self._acc_dx: float = 0.0
         self._acc_dy: float = 0.0
 
-        # Key mapping dictionary
-        self._special_keys = {
-            "enter": Key.enter,
-            "return": Key.enter,
-            "backspace": Key.backspace,
-            "tab": Key.tab,
-            "space": Key.space,
-            "esc": Key.esc,
-            "escape": Key.esc,
-            "delete": Key.delete,
-            "shift": Key.shift,
-            "shift_r": Key.shift_r,
-            "ctrl": Key.ctrl_l,
-            "control": Key.ctrl_l,
-            "alt": Key.alt_l,
-            "cmd": Key.cmd,
-            "super": Key.cmd,
-            "win": Key.cmd,
-            "up": Key.up,
-            "down": Key.down,
-            "left": Key.left,
-            "right": Key.right,
-            "home": Key.home,
-            "end": Key.end,
-            "pageup": Key.page_up,
-            "pagedown": Key.page_down,
-            "capslock": Key.caps_lock,
-            "f1": Key.f1,
-            "f2": Key.f2,
-            "f3": Key.f3,
-            "f4": Key.f4,
-            "f5": Key.f5,
-            "f6": Key.f6,
-            "f7": Key.f7,
-            "f8": Key.f8,
-            "f9": Key.f9,
-            "f10": Key.f10,
-            "f11": Key.f11,
-            "f12": Key.f12,
-        }
-
-    def _resolve_button(self, name: str) -> Button:
-        btn = name.lower()
-        if btn == "right":
-            return Button.right
-        elif btn == "middle":
-            return Button.middle
-        return Button.left
-
-    def _resolve_key(self, key_str: str):
-        normalized = key_str.lower()
-        if normalized in self._special_keys:
-            return self._special_keys[normalized]
-        if len(key_str) == 1:
-            return key_str
-        return None
-
     def move_mouse(self, dx: float, dy: float):
-        """Relative mouse move with sub-pixel accumulator."""
+        """Relative cursor motion with sub-pixel accumulator."""
         self._acc_dx += dx
         self._acc_dy += dy
-        
-        move_x = int(self._acc_dx)
-        move_y = int(self._acc_dy)
-        
-        if move_x != 0 or move_y != 0:
-            self.mouse.move(move_x, move_y)
-            self._acc_dx -= move_x
-            self._acc_dy -= move_y
-    def move_mouse_abs(self, norm_x: float, norm_y: float, screen_width: int, screen_height: int, left: int = 0, top: int = 0):
-        """
-        Direct Target Positioning: Moves mouse pointer immediately to the normalized
-        touch coordinate (0.0 - 1.0) on the host monitor.
-        """
-        clamped_x = max(0.0, min(1.0, float(norm_x)))
-        clamped_y = max(0.0, min(1.0, float(norm_y)))
-        target_x = int(round(left + clamped_x * screen_width))
-        target_y = int(round(top + clamped_y * screen_height))
-        try:
-            self.mouse.position = (target_x, target_y)
-            self._acc_dx = 0.0
-            self._acc_dy = 0.0
-        except Exception as e:
-            logger.error(f"Error setting absolute mouse position ({target_x}, {target_y}): {e}")
 
-    def click_mouse(self, button_name: str = "left", count: int = 1):
-        """Perform a single or double click."""
-        btn = self._resolve_button(button_name)
-        self.mouse.click(btn, count)
+        int_x = int(self._acc_dx)
+        int_y = int(self._acc_dy)
 
-    def mouse_down(self, button_name: str = "left"):
-        """Press and hold mouse button (e.g. for drag & drop)."""
-        btn = self._resolve_button(button_name)
-        self.mouse.press(btn)
-        self._pressed_mouse_buttons.add(btn)
+        if int_x != 0 or int_y != 0:
+            self._acc_dx -= int_x
+            self._acc_dy -= int_y
+            user32.mouse_event(MOUSEEVENTF_MOVE, int_x, int_y, 0, 0)
 
-    def mouse_up(self, button_name: str = "left"):
-        """Release held mouse button."""
-        btn = self._resolve_button(button_name)
-        self.mouse.release(btn)
-        self._pressed_mouse_buttons.discard(btn)
+    def move_mouse_abs(self, norm_x: float, norm_y: float, screen_w: int, screen_h: int, screen_left: int = 0, screen_top: int = 0):
+        """Direct absolute cursor positioning using normalized (0.0 to 1.0) coordinates."""
+        norm_x = max(0.0, min(1.0, norm_x))
+        norm_y = max(0.0, min(1.0, norm_y))
+        target_x = int(screen_left + norm_x * screen_w)
+        target_y = int(screen_top + norm_y * screen_h)
+        user32.SetCursorPos(target_x, target_y)
+
+    def click_mouse(self, button: str = "left", count: int = 1):
+        """Mouse click emulation."""
+        b = button.lower()
+        if b == "right":
+            down_flag, up_flag = MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP
+        elif b == "middle":
+            down_flag, up_flag = MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP
+        else:
+            down_flag, up_flag = MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP
+
+        for _ in range(count):
+            user32.mouse_event(down_flag, 0, 0, 0, 0)
+            time.sleep(0.005)
+            user32.mouse_event(up_flag, 0, 0, 0, 0)
+            if count > 1:
+                time.sleep(0.04)
+
+    def mouse_down(self, button: str = "left"):
+        """Press and hold mouse button."""
+        b = button.lower()
+        if b == "right":
+            user32.mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0)
+        elif b == "middle":
+            user32.mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, 0)
+        else:
+            user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+        self._pressed_buttons.add(b)
+
+    def mouse_up(self, button: str = "left"):
+        """Release mouse button."""
+        b = button.lower()
+        if b == "right":
+            user32.mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0)
+        elif b == "middle":
+            user32.mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0)
+        else:
+            user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+        self._pressed_buttons.discard(b)
 
     def scroll_mouse(self, dx: float, dy: float):
-        """Scroll vertical or horizontal."""
-        # Windows / pynput mouse.scroll(dx, dy)
-        self.mouse.scroll(int(round(dx)), int(round(dy)))
+        """Vertical/horizontal mouse wheel scroll."""
+        if dy != 0:
+            # Win32 WHEEL_DELTA is 120
+            wheel_amount = int(dy * 120)
+            user32.mouse_event(MOUSEEVENTF_WHEEL, 0, 0, wheel_amount, 0)
+
+    def _resolve_vk(self, key_str: str) -> Optional[int]:
+        """Convert key name or character to Windows Virtual-Key code."""
+        k = key_str.lower()
+        if k in VK_MAPPING:
+            return VK_MAPPING[k]
+        if len(key_str) == 1:
+            ch = key_str.upper()
+            vk = ord(ch)
+            if (0x30 <= vk <= 0x39) or (0x41 <= vk <= 0x5A):  # 0-9 or A-Z
+                return vk
+        return None
 
     def key_down(self, key_str: str):
-        """Press down a key."""
-        resolved = self._resolve_key(key_str)
-        if resolved is not None:
-            try:
-                self.keyboard.press(resolved)
-                self._pressed_keys.add(resolved)
-            except Exception as e:
-                logger.warning(f"Failed to press key {key_str}: {e}")
+        """Press and hold key."""
+        vk = self._resolve_vk(key_str)
+        if vk is not None:
+            user32.keybd_event(vk, 0, 0, 0)
+            self._pressed_keys.add(vk)
 
     def key_up(self, key_str: str):
-        """Release a pressed key."""
-        resolved = self._resolve_key(key_str)
-        if resolved is not None:
-            try:
-                self.keyboard.release(resolved)
-                self._pressed_keys.discard(resolved)
-            except Exception as e:
-                logger.warning(f"Failed to release key {key_str}: {e}")
+        """Release key."""
+        vk = self._resolve_vk(key_str)
+        if vk is not None:
+            user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
+            self._pressed_keys.discard(vk)
 
     def key_tap(self, key_str: str, modifiers: Optional[List[str]] = None):
-        """
-        Tap a key with optional modifier combinations (e.g. Ctrl + C).
-        Safely presses modifiers, taps target key, and releases modifiers.
-        """
-        resolved_mods = []
+        """Tap key with optional active modifier keys."""
+        pressed_mods: List[int] = []
         if modifiers:
             for mod in modifiers:
-                m = self._resolve_key(mod)
-                if m is not None:
-                    resolved_mods.append(m)
+                mvk = self._resolve_vk(mod)
+                if mvk is not None and mvk not in self._pressed_keys:
+                    user32.keybd_event(mvk, 0, 0, 0)
+                    pressed_mods.append(mvk)
+                    self._pressed_keys.add(mvk)
 
-        resolved_key = self._resolve_key(key_str)
-        if resolved_key is None:
-            return
+        vk = self._resolve_vk(key_str)
+        if vk is not None:
+            user32.keybd_event(vk, 0, 0, 0)
+            time.sleep(0.01)
+            user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
+        elif len(key_str) == 1:
+            self.type_text(key_str)
 
-        try:
-            for mod in resolved_mods:
-                self.keyboard.press(mod)
-
-            self.keyboard.press(resolved_key)
-            self.keyboard.release(resolved_key)
-
-            for mod in reversed(resolved_mods):
-                self.keyboard.release(mod)
-        except Exception as e:
-            logger.error(f"Error during key tap ({modifiers} + {key_str}): {e}")
+        # Release modifiers held for this tap
+        for mvk in pressed_mods:
+            user32.keybd_event(mvk, 0, KEYEVENTF_KEYUP, 0)
+            self._pressed_keys.discard(mvk)
 
     def type_text(self, text: str):
-        """Type arbitrary string."""
-        try:
-            self.keyboard.type(text)
-        except Exception as e:
-            logger.error(f"Error typing text: {e}")
+        """Type Unicode text safely via SendInput without keyboard layout issues."""
+        for ch in text:
+            code = ord(ch)
+            inp_down = INPUT(type=1)
+            inp_down.u.ki.wVk = 0
+            inp_down.u.ki.wScan = code
+            inp_down.u.ki.dwFlags = KEYEVENTF_UNICODE
+
+            inp_up = INPUT(type=1)
+            inp_up.u.ki.wVk = 0
+            inp_up.u.ki.wScan = code
+            inp_up.u.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
+
+            inputs = (INPUT * 2)(inp_down, inp_up)
+            user32.SendInput(2, inputs, ctypes.sizeof(INPUT))
+            time.sleep(0.002)
 
     def release_all(self):
-        """Emergency release of all currently held buttons and keys to avoid stuck states."""
-        for btn in list(self._pressed_mouse_buttons):
+        """Failsafe: release all pressed mouse buttons and keys."""
+        for vk in list(self._pressed_keys):
             try:
-                self.mouse.release(btn)
-            except Exception:
-                pass
-        self._pressed_mouse_buttons.clear()
-
-        for k in list(self._pressed_keys):
-            try:
-                self.keyboard.release(k)
+                user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
             except Exception:
                 pass
         self._pressed_keys.clear()
-        self._acc_dx = 0.0
-        self._acc_dy = 0.0
+
+        for b in list(self._pressed_buttons):
+            try:
+                if b == "right":
+                    user32.mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0)
+                elif b == "middle":
+                    user32.mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0)
+                else:
+                    user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+            except Exception:
+                pass
+        self._pressed_buttons.clear()
