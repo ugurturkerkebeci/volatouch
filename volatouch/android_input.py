@@ -88,6 +88,19 @@ class AndroidInputController:
     def move_mouse_abs(self, norm_x: float, norm_y: float, screen_w: int, screen_h: int, screen_left: int = 0, screen_top: int = 0):
         target_x = max(0, min(screen_w - 1, int(norm_x * screen_w)))
         target_y = max(0, min(screen_h - 1, int(norm_y * screen_h)))
+
+        if self.is_down:
+            dx = target_x - self.last_x
+            dy = target_y - self.last_y
+            dist = (dx * dx + dy * dy) ** 0.5
+            if dist > 25:
+                # Real-time touch drag segment
+                self._exec_input("swipe", self.last_x, self.last_y, target_x, target_y, 50)
+                self.last_x = target_x
+                self.last_y = target_y
+                self.has_dragged = True
+                return
+
         self.last_x = target_x
         self.last_y = target_y
 
@@ -109,6 +122,7 @@ class AndroidInputController:
             self.android_nav("back")
             return
         self.is_down = True
+        self.has_dragged = False
         self.down_pos = (self.last_x, self.last_y)
         self.down_time = time.time()
 
@@ -116,15 +130,16 @@ class AndroidInputController:
         if not self.is_down:
             return
         self.is_down = False
-        duration_ms = max(50, min(1000, int((time.time() - self.down_time) * 1000)))
         start_x, start_y = self.down_pos
         end_x, end_y = self.last_x, self.last_y
-
         dist_sq = (end_x - start_x) ** 2 + (end_y - start_y) ** 2
-        if dist_sq < 100:
-            self._exec_input("tap", end_x, end_y)
-        else:
-            self._exec_input("swipe", start_x, start_y, end_x, end_y, duration_ms)
+
+        if not getattr(self, "has_dragged", False):
+            if dist_sq < 250:
+                self._exec_input("tap", end_x, end_y)
+            else:
+                duration_ms = max(50, min(800, int((time.time() - self.down_time) * 1000)))
+                self._exec_input("swipe", start_x, start_y, end_x, end_y, duration_ms)
 
     def scroll_mouse(self, dx: float, dy: float):
         swipe_dist = int(dy * 200)

@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="volatouch",
-    version="1.3.1",
+    version="1.3.2",
     author="Uğur Türker Kebeci",
     author_email="167927605+ugurturkerkebeci@users.noreply.github.com",
     description="Zero-dependency ultra-low latency bidirectional remote control for PC and Android phone over Wi-Fi.",
