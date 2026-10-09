@@ -168,7 +168,7 @@ export const App: React.FC = () => {
             <div className="flex-1 text-xs sm:text-sm">
               <div className="flex items-center justify-between">
                 <h4 className="font-bold text-slate-100">
-                  {lang === 'tr' ? 'Android Ekran İzni Gerekli' : 'Android Screen Permission Required'}
+                  {lang === 'tr' ? 'Android Ekran Erişimi (Rootsuz)' : 'Android Screen Access (Zero-Root)'}
                 </h4>
                 <button
                   onClick={() => setShowAndroidPermTip(false)}
@@ -179,13 +179,13 @@ export const App: React.FC = () => {
               </div>
               <p className="text-slate-300 mt-1 leading-relaxed">
                 {lang === 'tr'
-                  ? 'Termux ekran görüntüsü yakalayamıyor (0 fps). Ekran görüntüsü ve dokunmatik kontrol izni için Termux\'ta şunlardan birini kullanın:'
-                  : 'Termux could not capture display (0 fps). Android requires elevated privileges for screencap and input:'}
+                  ? 'Android güvenlik politikası nedeniyle Termux\'ta ekran yakalamak ve dokunmatik kontrol için Root OLMADAN şu yöntemleri kullanabilirsiniz:'
+                  : 'Android security restricts background screencap. To stream without Root, use any of these methods:'}
               </p>
-              <div className="mt-2 p-2 bg-slate-950/80 rounded-lg font-mono text-[11px] text-amber-300 space-y-1 border border-slate-800">
-                <div>1. Root: <code className="text-white font-bold">su</code> ardından <code className="text-indigo-400">volatouch</code></div>
-                <div>2. Shizuku: <code className="text-white font-bold">rish -c volatouch</code></div>
-                <div>3. ADB / Kablosuz: <code className="text-white font-bold">adb shell volatouch</code></div>
+              <div className="mt-2 p-2 bg-slate-950/80 rounded-lg font-mono text-[11px] text-amber-300 space-y-1.5 border border-slate-800">
+                <div>⚡ 1. Kablosuz Debug (Rootsuz): <code className="text-white font-bold">pkg install android-tools && adb connect localhost:&lt;port&gt;</code></div>
+                <div>⚡ 2. Shizuku (Rootsuz): <code className="text-white font-bold">rish -c volatouch</code></div>
+                <div>⚡ 3. PC'den USB/Wi-Fi: <code className="text-white font-bold">adb shell volatouch</code></div>
               </div>
             </div>
           </div>

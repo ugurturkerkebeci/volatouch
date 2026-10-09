@@ -48,15 +48,30 @@ Volatouch is a pure Python application with **ZERO third-party pip dependencies*
 2. Open the printed URL (e.g. `http://192.168.1.5:8000`) in Chrome or Safari on your phone.
 3. Your phone instantly becomes a wireless multi-touch trackpad, air mouse, and keyboard for your PC.
 
-### Scenario B: Control your Android Phone from your PC 💻 ➔ 📱
-1. On your Android phone (inside **Termux** or terminal):
-   ```bash
-   pkg install python
-   pip install volatouch
-   volatouch
-   ```
-2. Open the printed phone URL (e.g. `http://192.168.1.20:8000`) in any browser on your desktop computer.
-3. Click, swipe, and scroll on your phone screen with your PC mouse, type directly into apps using your physical PC keyboard, and use the floating Android Navigation Bar (`Back`, `Home`, `Recents`, `Power`, `Volume`).
+### Scenario B: Control your Android Phone from your PC (Zero-Root) 💻 ➔ 📱
+Android requires elevated permissions for screen capture. You can run Volatouch with **ZERO ROOT** using any of these 3 standard methods:
+
+- **Method 1: Wireless Debugging directly on your phone (Zero-Root, No PC needed):**
+  1. In Android Settings -> Developer Options -> Turn on **Wireless Debugging**.
+  2. In Termux, install ADB and connect to localhost:
+     ```bash
+     pkg install android-tools python
+     pip install volatouch
+     adb connect localhost:<wireless-debugging-port>
+     volatouch
+     ```
+- **Method 2: Shizuku (Zero-Root, One-click):**
+  If you use Shizuku, launch Volatouch inside Termux with:
+  ```bash
+  rish -c volatouch
+  ```
+- **Method 3: From your PC via USB or Wi-Fi (Zero-Root):**
+  Plug your phone into your PC with USB debugging enabled, and run:
+  ```bash
+  adb shell volatouch
+  ```
+
+Open the printed URL (e.g. `http://192.168.1.20:8000`) in your PC desktop browser to control your phone with mouse and keyboard!
 
 ---
 

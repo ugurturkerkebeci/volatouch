@@ -1,6 +1,7 @@
 """
 Volatouch Android Input Controller
 Zero-Dependency input injection engine using /system/bin/input.
+Zero-Root Support: Local ADB, Wireless Debugging, Shizuku (rish), and Root (su).
 """
 
 import os
@@ -22,10 +23,26 @@ class AndroidInputController:
         self.down_time: float = 0.0
 
     def _detect_cmd_prefix(self) -> List[str]:
-        if shutil.which("su") or os.path.exists("/system/xbin/su") or os.path.exists("/system/bin/su"):
-            return ["su", "-c"]
-        if shutil.which("rish"):
+        # 1. Test ADB (Zero-Root)
+        adb_bin = shutil.which("adb")
+        if adb_bin:
+            try:
+                r = subprocess.run([adb_bin, "shell", "echo ok"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2)
+                if r.returncode == 0 and b"ok" in r.stdout:
+                    return ["adb", "shell"]
+            except Exception:
+                pass
+
+        # 2. Test Shizuku (Zero-Root)
+        rish_bin = shutil.which("rish")
+        if rish_bin:
             return ["rish", "-c"]
+
+        # 3. Test Root
+        for su_candidate in ["su", "/system/xbin/su", "/system/bin/su"]:
+            if shutil.which(su_candidate) or os.path.exists(su_candidate):
+                return [su_candidate, "-c"]
+
         return []
 
     def _find_binary(self, name: str) -> str:
@@ -39,8 +56,10 @@ class AndroidInputController:
 
     def _exec_input(self, *args):
         try:
-            cmd_str = f"{self.input_bin} " + " ".join(str(a) for a in args)
-            if self.cmd_prefix:
+            if self.cmd_prefix == ["adb", "shell"]:
+                cmd = ["adb", "shell", self.input_bin] + [str(a) for a in args]
+            elif self.cmd_prefix:
+                cmd_str = f"{self.input_bin} " + " ".join(str(a) for a in args)
                 cmd = self.cmd_prefix + [cmd_str]
             else:
                 cmd = [self.input_bin] + [str(a) for a in args]
@@ -85,14 +104,11 @@ class AndroidInputController:
 
         dist_sq = (end_x - start_x) ** 2 + (end_y - start_y) ** 2
         if dist_sq < 100:
-            # Short / motionless tap
             self._exec_input("tap", end_x, end_y)
         else:
-            # Swipe / drag
             self._exec_input("swipe", start_x, start_y, end_x, end_y, duration_ms)
 
     def scroll_mouse(self, dx: float, dy: float):
-        # Convert scroll delta into smooth vertical swipe
         swipe_dist = int(dy * 200)
         start_y = max(300, min(1800, self.last_y))
         end_y = max(100, min(2200, start_y + swipe_dist))
@@ -136,7 +152,6 @@ class AndroidInputController:
     def type_text(self, text: str):
         if not text:
             return
-        # /system/bin/input text handles strings where spaces are represented as %s
         formatted = text.replace(" ", "%s")
         escaped = ""
         for ch in formatted:
