@@ -6,10 +6,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="volatouch",
-    version="1.0.0",
+    version="1.0.1",
     author="Uğur Türker Kebeci",
     author_email="167927605+ugurturkerkebeci@users.noreply.github.com",
-    description="Ultra-low latency mobile air control & wireless trackpad for PC over local Wi-Fi.",
+    description="Ultra-low latency mobile air control & wireless trackpad for PC over Wi-Fi.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/ugurturkerkebeci/volatouch",
@@ -43,9 +43,15 @@ setup(
         "uvicorn[standard]>=0.22.0",
         "websockets>=11.0",
         "mss>=9.0.0",
-        "opencv-python>=4.8.0",
+        "Pillow>=9.0.0",
         "pynput>=1.7.6",
     ],
+    extras_require={
+        "accelerated": [
+            "opencv-python>=4.8.0",
+            "numpy>=1.20.0",
+        ],
+    },
     entry_points={
         "console_scripts": [
             "volatouch=volatouch.cli:main",

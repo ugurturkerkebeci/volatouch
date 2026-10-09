@@ -18,69 +18,80 @@
   <a href="https://github.com/ugurturkerkebeci/volatouch/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-emerald.svg?style=for-the-badge" alt="License: MIT" /></a>
   <a href="https://github.com/ugurturkerkebeci/volatouch/stargazers"><img src="https://img.shields.io/github/stars/ugurturkerkebeci/volatouch?style=for-the-badge&color=eab308" alt="GitHub Stars" /></a>
   <a href="https://github.com/ugurturkerkebeci/volatouch/issues"><img src="https://img.shields.io/github/issues/ugurturkerkebeci/volatouch?style=for-the-badge&color=ec4899" alt="GitHub Issues" /></a>
+  <img src="https://img.shields.io/badge/Footprint-Ultra--Lightweight-22c55e.svg?style=for-the-badge" alt="Ultra-Lightweight" />
   <img src="https://img.shields.io/badge/Platform-Windows-0284c7.svg?style=for-the-badge&logo=windows" alt="Platform: Windows" />
 </p>
 
 <p align="center">
   <a href="#quick-start">⚡ Quick Start</a> •
+  <a href="#why-volatouch">🌟 Why Volatouch?</a> •
   <a href="#features">✨ Features</a> •
   <a href="#gestures">📱 Gestures</a> •
+  <a href="#cli-usage">💻 CLI Usage</a> •
   <a href="#security">🛡️ Security</a> •
-  <a href="#settings">⚙️ Settings</a> •
-  <a href="#from-source">💻 From Source</a> •
-  <a href="#turkce-rehber">🇹🇷 Türkçe Rehber</a>
+  <a href="#from-source">🛠️ From Source</a>
 </p>
 
 ---
 
 <a id="quick-start"></a>
-## ⚡ Quick Start (PyPI)
+## ⚡ Quick Start
 
-Install and launch Volatouch with a single command from your terminal:
+Install and launch Volatouch in seconds from your command line:
 
 ```bash
-# 1. Install Volatouch via pip
+# 1. Install via pip (ultra-lightweight package, <100 KB)
 pip install volatouch
 
-# 2. Launch the server
+# 2. Start the air control server
 volatouch
 ```
 
-Once started, the console displays your local server address (e.g., `http://192.168.1.5:8000`).  
-Open this URL in **Safari** or **Chrome** on your phone (connected to the same Wi-Fi) — **no mobile app installation required!**
+Once running, open the URL displayed in the terminal (e.g. `http://192.168.1.5:8000`) in **Safari** or **Chrome** on any phone connected to the same Wi-Fi.  
+**No mobile app installation, no registration, no configuration required!**
+
+---
+
+<a id="why-volatouch"></a>
+## 🌟 Why Volatouch?
+
+- **🪶 100% Standalone & Zero-Bloat:**
+  - **No 100 MB OpenCV Dependency:** Uses a lightweight PIL engine by default (~3 MB) with optional automatic OpenCV acceleration if available.
+  - **Self-Contained Web Client:** The complete, modern React + Tailwind touch interface is pre-bundled directly within the package (~220 KB). You don't need Node.js, npm, or any frontend build step at runtime.
+  - Total package wheel size is **under 100 KB**!
+
+- **⚡ Hardware-Level 60 FPS & Near-Zero Latency:**
+  - Screen frames captured at the hardware display level via `mss`.
+  - Transmitted over WebSockets as raw **Binary ArrayBuffers** (no Base64 overhead).
+  - Single-slot atomic queues (`asyncio.Queue(maxsize=1)`) prevent buffer bloat and frame queuing.
+  - Rendered client-side on an HTML5 `<canvas>` using `createImageBitmap` and `requestAnimationFrame`.
+
+- **🎯 Dual Navigation Modes:**
+  - **Direct Target Mode:** Tap anywhere on your phone to instantly teleport the cursor to that point on your PC display.
+  - **Relative Trackpad Mode:** Smooth trackpad navigation with acceleration and configurable sensitivity.
 
 ---
 
 <a id="features"></a>
-## ✨ Key Features
-
-- **🚀 Ultra-Low Latency Binary Video Streaming:**
-  - Screen capture powered by `mss` delivering hardware-level **60 FPS**.
-  - Direct 4-channel BGRA JPEG compression via OpenCV (`cv2.imencode`), skipping CPU color-space conversions.
-  - Raw binary ArrayBuffer transmission over WebSockets with 8-byte high-precision double timestamp headers for sub-millisecond round-trip profiling.
-  - Zero-delay, single-slot subscriber queues (`asyncio.Queue(maxsize=1)`) prevent buffer bloat and queue lag.
-
-- **🎯 Dual Input Modes (Direct Target & Relative Trackpad):**
-  - **Direct Mode:** Tap anywhere on your phone's screen to navigate the cursor directly to that coordinate on your desktop display.
-  - **Relative Trackpad Mode:** Precision multi-touch trackpad navigation with acceleration and configurable sensitivity.
+## ✨ Features
 
 - **🏝️ Draggable Floating Action Island:**
-  - **L-Click / R-Click:** Dedicated, ergonomic primary action buttons.
-  - **Hold / Drag Lock:** One-tap persistent mouse hold with tactile haptic feedback for window movement and drag-and-drop.
-  - **Scroll Up / Down:** Instant micro-step vertical scrolling without needing two-finger gestures.
-  - **Collapsible Mini-Pill:** Compact mode keeps 100% of your screen visible when not interacting.
-  - **Auto Boundary Clamping:** Widgets automatically re-align to stay safely within the viewport across orientation changes and fullscreen toggles.
+  - Dedicated **L-Click** and **R-Click** buttons.
+  - **HOLD / LOCKED Button:** One-touch left-click lock with tactile vibration feedback for moving windows and drag-and-drop.
+  - **UP & DOWN Scroll Buttons:** Dedicated micro-step mouse wheel scrollers.
+  - **Collapsible Mini-Pill:** Minimize the controls into a small floating dot to maximize visible screen real estate.
+  - **Boundary Clamping:** Widgets automatically re-align to stay safely within the viewport on orientation change or fullscreen.
 
 - **⌨️ Comprehensive Built-In Virtual Keyboard:**
-  - Full **QWERTY layout** with smart dynamic Caps / Shift character switching.
-  - **Sticky Modifier Keys:** `Ctrl`, `Shift`, `Alt`, and `Win (Super)` lock on tap (highlighted in indigo) for seamless desktop combos (e.g., `Ctrl` + `C`).
-  - Dedicated **F1–F12 function row**, navigation keys (`Esc`, `Tab`, `Home`, `End`, Arrows), and **Voice / Text input drawer**.
+  - Full **QWERTY layout** with dynamic Caps / Shift character switching.
+  - **Sticky Modifier Keys:** `Ctrl`, `Shift`, `Alt`, and `Win (Super)` lock on tap (highlighted in indigo) for desktop shortcuts (e.g., `Ctrl` + `C`).
+  - Function keys (**F1–F12**), navigation keys (`Esc`, `Tab`, `Home`, `End`), and a **Voice / Text drawer**.
 
-- **📱 Landscape Edge-to-Edge Fill Mode:**
-  - Switch between **Fit (Aspect Ratio)** and **Fill (Full Screen Stretch)** modes to eliminate black side bars on widescreen mobile displays.
+- **📱 Landscape Edge-to-Edge Fill:**
+  - Toggle between **Fit** (aspect ratio preservation) and **Fill** (edge-to-edge stretch) to eliminate black side bars on widescreen mobile devices.
 
-- **🌐 Bilingual UI (English & Türkçe):**
-  - Instant toggle between English and Turkish directly from Settings, remembered via `localStorage`.
+- **🌐 English & Turkish Language Support:**
+  - Default English interface with an instant Turkish language switcher saved in `localStorage`.
 
 ---
 
@@ -89,90 +100,83 @@ Open this URL in **Safari** or **Chrome** on your phone (connected to the same W
 
 | Gesture / Action | Relative Mode | Direct Mode |
 | :--- | :--- | :--- |
-| **1-Finger Drag** | Relative Mouse Cursor Movement | Direct Mouse Cursor Positioning |
-| **1-Finger Tap** | Left Click (Mouse 1) | Left Click at Tap Point |
-| **2-Finger Tap** | Right Click (Mouse 2) | Right Click at Tap Point |
-| **2-Finger Scroll** | Smooth Vertical Mouse Wheel Scroll | Smooth Vertical Mouse Wheel Scroll |
-| **Long Press (>350ms)** | Drag & Drop (Left Mouse Down) | Drag & Drop at Point |
+| **1-Finger Drag** | Smooth Relative Mouse Movement | Direct Absolute Cursor Navigation |
+| **1-Finger Tap** | Left Click (Mouse 1) | Left Click at Touch Location |
+| **2-Finger Tap** | Right Click (Mouse 2) | Right Click at Touch Location |
+| **2-Finger Scroll** | Smooth Vertical Wheel Scroll | Smooth Vertical Wheel Scroll |
+| **Long Press (>350ms)** | Drag & Drop (Left Mouse Down) | Drag & Drop at Location |
 | **Island `[ HOLD ]`** | Toggles Left Button Lock | Toggles Left Button Lock |
 | **Island `[ UP/DOWN ]`**| Mouse Scroll Wheel Increment | Mouse Scroll Wheel Increment |
+
+---
+
+<a id="cli-usage"></a>
+## 💻 CLI Usage
+
+Launch Volatouch with custom network and display parameters:
+
+```text
+usage: volatouch [-h] [--host HOST] [--port PORT] [--quality QUALITY]
+                 [--scale SCALE] [--version]
+
+Volatouch: Ultra-Low Latency Mobile Air Control & Wireless Trackpad for PC over Wi-Fi.
+
+options:
+  -h, --help            Show this help message and exit
+  --host HOST           Host network interface to bind (default: 0.0.0.0)
+  -p PORT, --port PORT  Port to listen on (default: 8000)
+  -q QUALITY, --quality QUALITY
+                        Initial JPEG stream quality (10-100, default: 55)
+  -s SCALE, --scale SCALE
+                        Initial resolution scale (0.2-1.0, default: 0.70)
+  -v, --version         Show program's version number and exit
+```
+
+### Examples:
+
+```bash
+# Run on custom port
+volatouch -p 8080
+
+# Run with higher image quality
+volatouch -q 75 -s 0.85
+```
 
 ---
 
 <a id="security"></a>
 ## 🛡️ Security & Sandbox
 
-Volatouch implements defense-in-depth security to protect your workstation on shared Wi-Fi networks:
-
-1. **Subnet Verification (RFC-1918):** Only clients within the identical `/24` private local subnet as the host machine can access endpoints or initiate WebSocket handshakes. External and non-local requests receive an immediate `403 Forbidden`.
-2. **Strict Origin & CSP Isolation:** Rejects unauthorized origin headers; enforces modern `Content-Security-Policy`, `X-Frame-Options: DENY`, and strict frame-ancestors restrictions.
-3. **Whitelisted Hardware Commands:** Only explicit, sanitized commands (`mouse_move`, `mouse_click`, `key_tap`, etc.) are processed. Arbitrary shell commands are impossible.
-4. **Failsafe Key Release:** Whenever a WebSocket connection drops, all pressed keys and mouse buttons are instantly released via `input_ctrl.release_all()` to prevent stuck keys on your PC.
-5. **Private Console Telemetry:** No third-party tracking, no external web calls, and silenced debug logs. The host console only shows an active connection counter.
-
----
-
-<a id="settings"></a>
-## ⚙️ Settings & Diagnostics
-
-Tap the floating gear icon to access:
-- **JPEG Quality Slider (15% – 95%):** Dynamically tune bandwidth usage vs. visual clarity in real time.
-- **Resolution Scale Slider (30% – 100%):** Downscale resolution for ultra-high FPS over congested Wi-Fi channels.
-- **Cursor Speed & Acceleration:** Fine-tune trackpad velocity and exponential sensitivity curves.
-- **Real-time Latency & FPS Badge:** Monitor live stream frame rates and hardware round-trip ping in milliseconds.
-- **Language Selector:** Seamlessly switch between **English** and **Türkçe**.
+1. **Subnet Verification (RFC-1918):** Only devices within the same `/24` private local Wi-Fi subnet can access endpoints or establish WebSocket handshakes. External requests receive an immediate `403 Forbidden`.
+2. **Strict Origin & CSP Protection:** Enforces modern `Content-Security-Policy`, `X-Frame-Options: DENY`, and strict frame-ancestors restrictions.
+3. **Whitelisted Hardware Commands:** Only explicit, sanitized commands (`mouse_move`, `mouse_click`, `key_tap`, etc.) are processed. Arbitrary command execution is impossible.
+4. **Failsafe Key Release:** When a WebSocket connection drops, all pressed keys and mouse buttons are instantly released via `input_ctrl.release_all()` to prevent stuck keys.
 
 ---
 
 <a id="from-source"></a>
-## 💻 Running From Source
+## 🛠️ Running From Source
 
-If you prefer building and developing Volatouch locally:
-
-### Prerequisites
-- Python 3.8+ (Recommended: Python 3.10+)
-- Node.js 18+ (for building the frontend)
-
-### Setup
+If you want to clone and develop Volatouch locally:
 
 ```bash
 # 1. Clone repository
 git clone https://github.com/ugurturkerkebeci/volatouch.git
 cd volatouch
 
-# 2. Install Python dependencies
+# 2. Install dependencies
 pip install -r backend/requirements.txt
 
-# 3. Build React frontend
-cd frontend
-npm install
-npm run build
-cd ..
-
-# 4. Run application
+# 3. Run directly (uses bundled web client)
 python run.py
 ```
 
----
-
-<a id="turkce-rehber"></a>
-## 🇹🇷 Türkçe Rehber
-
-Volatouch, aynı yerel Wi-Fi ağına bağlı bilgisayarınızı mobil cihazınızın web tarayıcısı üzerinden sıfıra yakın gecikmeyle (ultra-low latency) yönetmenizi sağlayan yüksek performanslı bir uzaktan kontrol ve hava trackpad sistemidir.
-
-### Hızlı Kurulum (PyPI):
+Optional: To modify and re-compile the frontend web interface:
 ```bash
-pip install volatouch
-volatouch
+cd frontend
+npm install
+npm run build
 ```
-Konsolda yazan adresi (örn. `http://192.168.1.5:8000`) telefonunuzun tarayıcısında açmanız yeterlidir.
-
-### Başlıca Özellikler:
-- **Sıfır Gecikme:** `mss` ve `OpenCV` tabanlı binary JPEG akışı, doğrudan GPU'da çizilen HTML5 Canvas ile tear veya kare düşmesi yaşatmaz.
-- **Doğrudan ve Bağıl Mod:** İster ekrana dokunup imleci doğrudan oraya yönlendirin (Direct), ister dizüstü bilgisayar trackpad'i gibi kullanın (Relative).
-- **Yüzen Fonksiyon Adası:** Sol tık, sağ tık, dosya sürüklemek için sol tık kilidi (`HOLD`), ve hassas kaydırma (`UP`/`DOWN`) butonları.
-- **Dahili Türkçe/İngilizce QWERTY Klavye:** `Ctrl`, `Alt`, `Shift` gibi niteleyici tuşları basılı tutma desteği, F1–F12 tuşları ve ses/metin aktarım çekmecesi.
-- **Yerel Ağ Güvenliği:** Yalnızca aynı yerel Wi-Fi alt ağındaki (subnet) cihazların bağlanmasına izin verir.
 
 ---
 

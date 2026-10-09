@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "volatouch"
-version = "1.0.0"
-description = "Ultra-low latency mobile air control & wireless trackpad for PC over local Wi-Fi."
+version = "1.0.1"
+description = "Ultra-low latency mobile air control & wireless trackpad for PC over Wi-Fi."
 readme = "README.md"
 authors = [
     { name = "Uğur Türker Kebeci", email = "167927605+ugurturkerkebeci@users.noreply.github.com" }
@@ -33,8 +33,14 @@ dependencies = [
     "uvicorn[standard]>=0.22.0",
     "websockets>=11.0",
     "mss>=9.0.0",
-    "opencv-python>=4.8.0",
+    "Pillow>=9.0.0",
     "pynput>=1.7.6",
+]
+
+[project.optional-dependencies]
+accelerated = [
+    "opencv-python>=4.8.0",
+    "numpy>=1.20.0",
 ]
 
 [project.urls]
