@@ -1,7 +1,7 @@
 """
 Volatouch Android Screen Streamer
 Zero-Dependency Android framebuffer capture engine using /system/bin/screencap.
-Supports Direct execution, Root (su), and Shizuku (rish).
+Thread-safe event loop dispatch, Root (su), and Shizuku (rish) privilege integration.
 """
 
 import os
@@ -24,6 +24,7 @@ class AndroidScreenStreamer:
 
     def __init__(self):
         self.subscribers: Set[asyncio.Queue] = set()
+        self._subscribers_lock = threading.Lock()
         self.running = False
         self._thread: Optional[threading.Thread] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -63,22 +64,24 @@ class AndroidScreenStreamer:
             pass
 
         # 2. Test 'su -c' (Root)
-        if shutil.which("su") or os.path.exists("/system/xbin/su") or os.path.exists("/system/bin/su"):
-            try:
-                r = subprocess.run(["su", "-c", f"{self.screencap_bin} -p"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
-                if r.returncode == 0 and len(r.stdout) > 24:
-                    print("[+] Android: Root ('su') privileges detected and active for screen capture.", flush=True)
-                    return ["su", "-c"]
-            except Exception:
-                pass
+        for su_candidate in ["su", "/system/xbin/su", "/system/bin/su"]:
+            if shutil.which(su_candidate) or os.path.exists(su_candidate):
+                try:
+                    r = subprocess.run([su_candidate, "-c", f"{self.screencap_bin} -p"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
+                    if r.returncode == 0 and len(r.stdout) > 24:
+                        print(f"[+] Android: Root ('{su_candidate}') privileges active.", flush=True)
+                        return [su_candidate, "-c"]
+                except Exception:
+                    pass
 
         # 3. Test 'rish -c' (Shizuku)
-        if shutil.which("rish"):
+        rish_bin = shutil.which("rish")
+        if rish_bin:
             try:
-                r = subprocess.run(["rish", "-c", f"{self.screencap_bin} -p"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
+                r = subprocess.run([rish_bin, "-c", f"{self.screencap_bin} -p"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
                 if r.returncode == 0 and len(r.stdout) > 24:
-                    print("[+] Android: Shizuku ('rish') privileges detected and active for screen capture.", flush=True)
-                    return ["rish", "-c"]
+                    print("[+] Android: Shizuku ('rish') privileges active.", flush=True)
+                    return [rish_bin, "-c"]
             except Exception:
                 pass
 
@@ -122,11 +125,13 @@ class AndroidScreenStreamer:
 
     def subscribe(self) -> asyncio.Queue:
         q = asyncio.Queue(maxsize=2)
-        self.subscribers.add(q)
+        with self._subscribers_lock:
+            self.subscribers.add(q)
         return q
 
     def unsubscribe(self, q: asyncio.Queue):
-        self.subscribers.discard(q)
+        with self._subscribers_lock:
+            self.subscribers.discard(q)
 
     def update_settings(self, quality: Optional[int] = None, scale: Optional[float] = None):
         if quality is not None:
@@ -148,12 +153,12 @@ class AndroidScreenStreamer:
         if self.running:
             return
         self.running = True
-        self._thread = threading.Thread(target=self._capture_worker, daemon=True)
+        self._thread = threading.Thread(target=self._capture_worker, daemon=True, name="AndroidCaptureWorker")
         self._thread.start()
 
     def stop(self):
         self.running = False
-        if self._thread:
+        if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1.0)
             self._thread = None
 
@@ -170,7 +175,6 @@ class AndroidScreenStreamer:
                 data = proc.stdout
                 # If PNG magic bytes \x89PNG\r\n\x1a\n
                 if data.startswith(b"\x89PNG"):
-                    # Bytes 16 to 24 in PNG are Width and Height in Big-Endian unsigned int
                     w, h = struct.unpack(">II", data[16:24])
                     if w > 0 and h > 0:
                         self.screen_width = w
@@ -199,23 +203,36 @@ class AndroidScreenStreamer:
         while self.running:
             start_t = time.perf_counter()
 
-            if not self.subscribers:
+            with self._subscribers_lock:
+                has_subscribers = bool(self.subscribers)
+
+            if not has_subscribers:
                 time.sleep(0.05)
                 continue
 
             img_bytes = self._capture_frame()
-            if img_bytes and self._loop and self.running:
+            if img_bytes and self._loop and not self._loop.is_closed() and self.running:
                 now_ms = time.time() * 1000.0
                 packet = struct.pack(">d", now_ms) + img_bytes
 
-                for q in list(self.subscribers):
-                    if q.full():
-                        try:
-                            q.get_nowait()
-                        except Exception:
-                            pass
+                with self._subscribers_lock:
+                    active_subs = list(self.subscribers)
+
+                if active_subs:
+                    def _push(subs=active_subs, pkt=packet):
+                        for q in subs:
+                            if not q.empty():
+                                try:
+                                    q.get_nowait()
+                                except (asyncio.QueueEmpty, Exception):
+                                    pass
+                            try:
+                                q.put_nowait(pkt)
+                            except (asyncio.QueueFull, Exception):
+                                pass
+
                     try:
-                        self._loop.call_soon_threadsafe(q.put_nowait, packet)
+                        self._loop.call_soon_threadsafe(_push)
                     except Exception:
                         pass
 

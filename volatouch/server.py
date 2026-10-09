@@ -1,6 +1,6 @@
 """
 Volatouch Standalone Asyncio HTTP & WebSocket (RFC 6455) Server
-Zero external dependencies (No FastAPI, No Uvicorn, No Starlette).
+Zero external dependencies (Pure standard library).
 """
 
 import asyncio
@@ -90,7 +90,7 @@ class VolatouchServer:
             self.input_ctrl = InputController()
 
         self.active_devices: Dict[str, int] = {}
-        self.devices_lock = asyncio.Lock()
+        self.devices_lock: Optional[asyncio.Lock] = None
         self._server: Optional[asyncio.Server] = None
 
         # Resolve static web directory
@@ -103,15 +103,22 @@ class VolatouchServer:
         else:
             self.web_root = pkg_web
 
+    def _get_lock(self) -> asyncio.Lock:
+        if self.devices_lock is None:
+            self.devices_lock = asyncio.Lock()
+        return self.devices_lock
+
     async def register_connect(self, client_ip: str):
-        async with self.devices_lock:
+        lock = self._get_lock()
+        async with lock:
             prev = self.active_devices.get(client_ip, 0)
             self.active_devices[client_ip] = prev + 1
             if prev == 0:
                 print(f"[+] Device connected: {client_ip} | Active devices: {len(self.active_devices)}", flush=True)
 
     async def register_disconnect(self, client_ip: str):
-        async with self.devices_lock:
+        lock = self._get_lock()
+        async with lock:
             if client_ip in self.active_devices:
                 self.active_devices[client_ip] -= 1
                 if self.active_devices[client_ip] <= 0:
@@ -122,76 +129,90 @@ class VolatouchServer:
         peer = writer.get_extra_info("peername")
         client_ip = peer[0] if peer else "127.0.0.1"
 
-        # 1. Subnet Verification (RFC-1918)
-        if not is_same_network(client_ip, LOCAL_IP):
-            err_body = b'{"error":"Forbidden","message":"Access Denied: Must be on the same local subnet."}'
-            resp = (
-                b"HTTP/1.1 403 Forbidden\r\n"
-                b"Content-Type: application/json\r\n"
-                b"Content-Length: " + str(len(err_body)).encode("ascii") + b"\r\n"
-                b"Connection: close\r\n\r\n" + err_body
-            )
-            writer.write(resp)
-            await writer.drain()
-            writer.close()
-            return
-
         try:
-            # Read HTTP request header
-            header_bytes = await reader.readuntil(b"\r\n\r\n")
-        except Exception:
-            writer.close()
-            return
-
-        header_text = header_bytes.decode("latin-1", errors="ignore")
-        lines = header_text.split("\r\n")
-        if not lines or not lines[0]:
-            writer.close()
-            return
-
-        request_line = lines[0].split()
-        if len(request_line) < 2:
-            writer.close()
-            return
-
-        method, path = request_line[0].upper(), request_line[1]
-
-        headers: Dict[str, str] = {}
-        for line in lines[1:]:
-            if ": " in line:
-                k, v = line.split(": ", 1)
-                headers[k.lower()] = v.strip()
-
-        # Check WebSocket upgrade
-        is_ws = (
-            "upgrade" in headers.get("connection", "").lower()
-            and headers.get("upgrade", "").lower() == "websocket"
-        )
-
-        if is_ws:
-            ws_key = headers.get("sec-websocket-key", "")
-            if not ws_key:
-                writer.close()
+            # 1. Subnet Verification (RFC-1918)
+            if not is_same_network(client_ip, LOCAL_IP):
+                err_body = b'{"error":"Forbidden","message":"Access Denied: Must be on the same local subnet."}'
+                await self._send_http_response(writer, 403, "application/json", err_body)
                 return
 
-            accept_token = compute_ws_accept(ws_key)
-            handshake = (
-                "HTTP/1.1 101 Switching Protocols\r\n"
-                "Upgrade: websocket\r\n"
-                "Connection: Upgrade\r\n"
-                f"Sec-WebSocket-Accept: {accept_token}\r\n\r\n"
-            )
-            writer.write(handshake.encode("latin-1"))
-            await writer.drain()
+            # Read HTTP request header
+            try:
+                header_bytes = await reader.readuntil(b"\r\n\r\n")
+            except Exception:
+                try:
+                    writer.close()
+                    await writer.wait_closed()
+                except Exception:
+                    pass
+                return
 
-            if path.startswith("/ws/stream"):
-                await self._handle_ws_stream(reader, writer, client_ip)
-            elif path.startswith("/ws/input"):
-                await self._handle_ws_input(reader, writer, client_ip)
+            header_text = header_bytes.decode("latin-1", errors="ignore")
+            lines = header_text.split("\r\n")
+            if not lines or not lines[0]:
+                try:
+                    writer.close()
+                    await writer.wait_closed()
+                except Exception:
+                    pass
+                return
+
+            request_line = lines[0].split()
+            if len(request_line) < 2:
+                try:
+                    writer.close()
+                    await writer.wait_closed()
+                except Exception:
+                    pass
+                return
+
+            method, path = request_line[0].upper(), request_line[1]
+
+            headers: Dict[str, str] = {}
+            for line in lines[1:]:
+                if ": " in line:
+                    k, v = line.split(": ", 1)
+                    headers[k.lower()] = v.strip()
+
+            # Check WebSocket upgrade
+            is_ws = (
+                "upgrade" in headers.get("connection", "").lower()
+                and headers.get("upgrade", "").lower() == "websocket"
+            )
+
+            if is_ws:
+                ws_key = headers.get("sec-websocket-key", "")
+                if not ws_key:
+                    writer.close()
+                    await writer.wait_closed()
+                    return
+
+                accept_token = compute_ws_accept(ws_key)
+                handshake = (
+                    "HTTP/1.1 101 Switching Protocols\r\n"
+                    "Upgrade: websocket\r\n"
+                    "Connection: Upgrade\r\n"
+                    f"Sec-WebSocket-Accept: {accept_token}\r\n\r\n"
+                )
+                writer.write(handshake.encode("latin-1"))
+                await writer.drain()
+
+                if path.startswith("/ws/stream"):
+                    await self._handle_ws_stream(reader, writer, client_ip)
+                elif path.startswith("/ws/input"):
+                    await self._handle_ws_input(reader, writer, client_ip)
+                else:
+                    writer.close()
+                    await writer.wait_closed()
             else:
+                await self._handle_http(method, path, headers, reader, writer)
+
+        except Exception:
+            try:
                 writer.close()
-        else:
-            await self._handle_http(method, path, headers, reader, writer)
+                await writer.wait_closed()
+            except Exception:
+                pass
 
     async def _handle_http(self, method: str, path: str, headers: Dict[str, str], reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         clean_path = path.split("?")[0].lstrip("/")
@@ -210,7 +231,7 @@ class VolatouchServer:
                 "stream": self.streamer.get_settings()
             }
             body = json.dumps(info).encode("utf-8")
-            self._send_http_response(writer, 200, "application/json", body)
+            await self._send_http_response(writer, 200, "application/json", body)
             return
 
         # API: /api/settings
@@ -223,7 +244,7 @@ class VolatouchServer:
             except Exception:
                 pass
             res_body = json.dumps({"status": "ok", "current": self.streamer.get_settings()}).encode("utf-8")
-            self._send_http_response(writer, 200, "application/json", res_body)
+            await self._send_http_response(writer, 200, "application/json", res_body)
             return
 
         # Static file resolution
@@ -249,12 +270,12 @@ class VolatouchServer:
 
             with open(file_path, "rb") as f:
                 content = f.read()
-            self._send_http_response(writer, 200, content_type, content)
+            await self._send_http_response(writer, 200, content_type, content)
         else:
             err = b"<h1>404 - Web Assets Not Found</h1>"
-            self._send_http_response(writer, 404, "text/html", err)
+            await self._send_http_response(writer, 404, "text/html", err)
 
-    def _send_http_response(self, writer: asyncio.StreamWriter, status: int, content_type: str, body: bytes):
+    async def _send_http_response(self, writer: asyncio.StreamWriter, status: int, content_type: str, body: bytes):
         status_text = "200 OK" if status == 200 else ("404 Not Found" if status == 404 else f"{status} Status")
         headers = [
             f"HTTP/1.1 {status_text}",
@@ -269,19 +290,17 @@ class VolatouchServer:
             "Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; frame-ancestors 'none';"
         ]
         resp_data = ("\r\n".join(headers) + "\r\n\r\n").encode("latin-1") + body
-        writer.write(resp_data)
         try:
-            asyncio.create_task(self._safe_drain_and_close(writer))
-        except Exception:
-            pass
-
-    async def _safe_drain_and_close(self, writer: asyncio.StreamWriter):
-        try:
+            writer.write(resp_data)
             await writer.drain()
         except Exception:
             pass
         finally:
-            writer.close()
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception:
+                pass
 
     async def _read_ws_frame(self, reader: asyncio.StreamReader) -> Optional[Tuple[int, bytes]]:
         try:
@@ -312,6 +331,7 @@ class VolatouchServer:
     async def _handle_ws_stream(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, client_ip: str):
         await self.register_connect(client_ip)
         queue = self.streamer.subscribe()
+        write_lock = asyncio.Lock()
 
         async def incoming_loop():
             try:
@@ -324,8 +344,9 @@ class VolatouchServer:
                         break
                     elif opcode == 0x9:  # Ping
                         pong_frame = encode_ws_frame(payload, opcode=0xA)
-                        writer.write(pong_frame)
-                        await writer.drain()
+                        async with write_lock:
+                            writer.write(pong_frame)
+                            await writer.drain()
                     elif opcode == 0x1:  # Text
                         try:
                             data = json.loads(payload.decode("utf-8"))
@@ -336,8 +357,9 @@ class VolatouchServer:
                                 self.streamer.update_settings(scale=float(data.get("scale", 0.65)))
                             elif t == "ping":
                                 pong = json.dumps({"type": "pong", "time": data.get("time")}).encode("utf-8")
-                                writer.write(encode_ws_frame(pong, opcode=0x1))
-                                await writer.drain()
+                                async with write_lock:
+                                    writer.write(encode_ws_frame(pong, opcode=0x1))
+                                    await writer.drain()
                         except Exception:
                             pass
             except Exception:
@@ -346,18 +368,26 @@ class VolatouchServer:
         recv_task = asyncio.create_task(incoming_loop())
 
         try:
-            while True:
-                # Instant wakeup upon frame encoding - zero delay, zero polling
+            while not writer.is_closing():
                 packet_bytes = await queue.get()
                 wire_frame = encode_ws_frame(packet_bytes, opcode=0x2)
-                writer.write(wire_frame)
-                await writer.drain()
+                async with write_lock:
+                    writer.write(wire_frame)
+                    await writer.drain()
         except Exception:
             pass
         finally:
             self.streamer.unsubscribe(queue)
             recv_task.cancel()
-            writer.close()
+            try:
+                await recv_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception:
+                pass
             await self.register_disconnect(client_ip)
 
     async def _handle_ws_input(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, client_ip: str):
@@ -447,15 +477,25 @@ class VolatouchServer:
             pass
         finally:
             self.input_ctrl.release_all()
-            writer.close()
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception:
+                pass
             await self.register_disconnect(client_ip)
 
     async def run(self):
         loop = asyncio.get_running_loop()
+        self.devices_lock = asyncio.Lock()
         self.streamer.set_event_loop(loop)
         self.streamer.start()
 
-        self._server = await asyncio.start_server(self.handle_connection, self.host, self.port)
+        self._server = await asyncio.start_server(
+            self.handle_connection,
+            self.host,
+            self.port,
+            reuse_address=True
+        )
 
         print("\n" + "=" * 65)
         if self.platform == "android":
@@ -469,12 +509,22 @@ class VolatouchServer:
         print("[*] Ready. Waiting for client connections...\n", flush=True)
 
         try:
-            async with self._server:
-                await self._server.serve_forever()
+            await self._server.serve_forever()
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            pass
         finally:
+            if self._server:
+                self._server.close()
+                try:
+                    await self._server.wait_closed()
+                except Exception:
+                    pass
             self.input_ctrl.release_all()
             self.streamer.stop()
 
 def run_server(host: str = "0.0.0.0", port: int = 8000, mode: str = "auto"):
     server = VolatouchServer(host=host, port=port, mode=mode)
-    asyncio.run(server.run())
+    try:
+        asyncio.run(server.run())
+    except KeyboardInterrupt:
+        pass
