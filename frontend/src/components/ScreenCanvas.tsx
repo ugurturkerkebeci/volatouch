@@ -133,10 +133,8 @@ export const ScreenCanvas: React.FC<ScreenCanvasProps> = ({
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (isMouseDownRef.current) {
-        const { normX, normY } = getNormCoords(e.clientX, e.clientY);
-        onDirectMove(normX, normY);
-      }
+      const { normX, normY } = getNormCoords(e.clientX, e.clientY);
+      onDirectMove(normX, normY);
     };
 
     const handleMouseUp = (e: MouseEvent) => {
@@ -260,7 +258,7 @@ export const ScreenCanvas: React.FC<ScreenCanvasProps> = ({
     <div className="relative w-full h-full overflow-hidden bg-slate-950 flex items-center justify-center select-none touch-none">
       <canvas
         ref={canvasRef}
-        className="w-full h-full cursor-none block select-none touch-none"
+        className="w-full h-full cursor-default block select-none touch-none"
       />
 
       {status !== 'connected' && (

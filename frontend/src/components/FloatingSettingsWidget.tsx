@@ -113,8 +113,31 @@ export const FloatingSettingsWidget: React.FC<FloatingSettingsWidgetProps> = ({
     widgetRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
   };
 
-  const handleTouchEnd = () => {
-    dragStartRef.current = null;
+  const handleMouseDown = (e: React.MouseEvent) => {
+    dragStartRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initX: posRef.current.x,
+      initY: posRef.current.y,
+    };
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!dragStartRef.current || !widgetRef.current) return;
+      const dx = moveEvent.clientX - dragStartRef.current.startX;
+      const dy = moveEvent.clientY - dragStartRef.current.startY;
+      const boundWidth = isCollapsed ? 75 : 240;
+      const boundHeight = 44;
+      const newX = Math.max(8, Math.min(window.innerWidth - boundWidth - 8, dragStartRef.current.initX + dx));
+      const newY = Math.max(8, Math.min(window.innerHeight - boundHeight - 8, dragStartRef.current.initY + dy));
+      posRef.current = { x: newX, y: newY };
+      widgetRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
+    };
+    const onMouseUp = () => {
+      dragStartRef.current = null;
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
   };
 
   return (
@@ -130,7 +153,8 @@ export const FloatingSettingsWidget: React.FC<FloatingSettingsWidgetProps> = ({
       <div
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onTouchEnd={() => { dragStartRef.current = null; }}
+        onMouseDown={handleMouseDown}
         className="flex items-center space-x-1.5 px-1 py-1 cursor-grab active:scale-105"
       >
         <span

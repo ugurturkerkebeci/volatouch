@@ -71,7 +71,17 @@ class AndroidInputController:
                 cmd = self.cmd_prefix + [cmd_str]
             else:
                 cmd = [self.input_bin] + [str(a) for a in args]
-            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3)
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
+            if res.returncode != 0 and b"INJECT_EVENTS" in res.stderr:
+                if not getattr(self, "_warned_security", False):
+                    self._warned_security = True
+                    print("\n" + "!" * 65, flush=True)
+                    print("[!] XIAOMI / REDMI / MIUI SECURITY REQUIREMENT:", flush=True)
+                    print("[*] To allow mouse clicks, touch, and typing from PC:", flush=True)
+                    print("[*] Go to: Phone Settings -> Developer Options", flush=True)
+                    print("[*] Enable: 'USB debugging (Security settings)'", flush=True)
+                    print("[*] (Ayarlar ➔ Gelistirici Secenekleri ➔ 'USB Hata Ayiklama (Guvenlik Ayarlari)'ni acin)", flush=True)
+                    print("!" * 65 + "\n", flush=True)
         except Exception:
             pass
 

@@ -116,8 +116,32 @@ export const FloatingActionWidget: React.FC<FloatingActionWidgetProps> = ({
     widgetRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
   };
 
-  const handleTouchEnd = () => {
-    dragStartRef.current = null;
+  // Mouse drag handlers for desktop PC
+  const handleMouseDown = (e: React.MouseEvent) => {
+    dragStartRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initX: posRef.current.x,
+      initY: posRef.current.y,
+    };
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!dragStartRef.current || !widgetRef.current) return;
+      const dx = moveEvent.clientX - dragStartRef.current.startX;
+      const dy = moveEvent.clientY - dragStartRef.current.startY;
+      const boundWidth = isMinimized ? 56 : 330;
+      const boundHeight = isMinimized ? 56 : 65;
+      const newX = Math.max(8, Math.min(window.innerWidth - boundWidth - 8, dragStartRef.current.initX + dx));
+      const newY = Math.max(8, Math.min(window.innerHeight - boundHeight - 8, dragStartRef.current.initY + dy));
+      posRef.current = { x: newX, y: newY };
+      widgetRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
+    };
+    const onMouseUp = () => {
+      dragStartRef.current = null;
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
   };
 
   if (isMinimized) {
@@ -126,7 +150,8 @@ export const FloatingActionWidget: React.FC<FloatingActionWidgetProps> = ({
         ref={widgetRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onTouchEnd={() => { dragStartRef.current = null; }}
+        onMouseDown={handleMouseDown}
         style={{
           transform: `translate3d(${posRef.current.x}px, ${posRef.current.y}px, 0)`,
           willChange: 'transform'
@@ -161,7 +186,8 @@ export const FloatingActionWidget: React.FC<FloatingActionWidgetProps> = ({
       <div
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onTouchEnd={() => { dragStartRef.current = null; }}
+        onMouseDown={handleMouseDown}
         className="px-1.5 py-3 cursor-grab active:cursor-grabbing text-slate-400 hover:text-white flex items-center justify-center active:scale-105"
         title="Sürükle ve Taşı"
       >
