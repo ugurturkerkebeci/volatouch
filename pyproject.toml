@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "volatouch"
-version = "1.0.1"
+version = "1.0.2"
 description = "Ultra-low latency mobile air control & wireless trackpad for PC over Wi-Fi."
 readme = "README.md"
 authors = [

@@ -143,6 +143,7 @@ class ScreenStreamer:
             while self._running:
                 loop_start = time.perf_counter()
 
+                try:
                     raw_shot = sct.grab(monitor)
                     current_scale = self._scale
                     frame_bytes = None

@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="volatouch",
-    version="1.0.1",
+    version="1.0.2",
     author="Uğur Türker Kebeci",
     author_email="167927605+ugurturkerkebeci@users.noreply.github.com",
     description="Ultra-low latency mobile air control & wireless trackpad for PC over Wi-Fi.",
