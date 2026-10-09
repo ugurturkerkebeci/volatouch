@@ -4,20 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "volatouch"
-version = "1.1.0"
-description = "Zero-dependency ultra-low latency mobile air control & wireless trackpad for PC over Wi-Fi."
+version = "1.2.0"
+description = "Zero-dependency ultra-low latency bidirectional remote control for PC and Android phone over Wi-Fi."
 readme = "README.md"
 authors = [
     { name = "Uğur Türker Kebeci", email = "167927605+ugurturkerkebeci@users.noreply.github.com" }
 ]
 license = { text = "MIT" }
-keywords = ["remote-desktop", "trackpad", "air-control", "mouse", "keyboard", "low-latency", "zero-dependency", "screen-stream", "websockets"]
+keywords = ["remote-desktop", "trackpad", "air-control", "mouse", "keyboard", "low-latency", "zero-dependency", "screen-stream", "websockets", "android", "termux"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: MIT License",
     "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",

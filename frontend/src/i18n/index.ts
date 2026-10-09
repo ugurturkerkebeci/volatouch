@@ -37,6 +37,14 @@ export const translations = {
     send: "Send",
     taskMgr: "Task Mgr",
     minimize: "Minimize",
+    androidBack: "Back",
+    androidHome: "Home",
+    androidRecents: "Recents",
+    androidPower: "Power",
+    androidVolUp: "Vol +",
+    androidVolDown: "Vol -",
+    controllingPhone: "Controlling Phone from PC",
+    controllingPC: "Controlling PC from Mobile",
   },
   tr: {
     volatouch: "VOLATOUCH",
@@ -74,5 +82,13 @@ export const translations = {
     send: "Gönder",
     taskMgr: "Görev Yön.",
     minimize: "Küçült",
+    androidBack: "Geri",
+    androidHome: "Ana Ekran",
+    androidRecents: "Son Uygulamalar",
+    androidPower: "Güç",
+    androidVolUp: "Ses +",
+    androidVolDown: "Ses -",
+    controllingPhone: "PC'den Telefon Yönetimi",
+    controllingPC: "Mobilden PC Yönetimi",
   }
 };

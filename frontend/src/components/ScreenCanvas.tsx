@@ -11,6 +11,12 @@ interface ScreenCanvasProps {
   onRelativeTouchStart: (e: TouchEvent) => void;
   onRelativeTouchMove: (e: TouchEvent) => void;
   onRelativeTouchEnd: (e: TouchEvent) => void;
+  onMouseDown?: (button: 'left' | 'right') => void;
+  onMouseUp?: (button: 'left' | 'right') => void;
+  onMouseClick?: (button: 'left' | 'right') => void;
+  onScroll?: (dy: number) => void;
+  hostType?: 'windows' | 'android' | 'linux';
+  onAndroidNav?: (action: 'back' | 'home' | 'recents' | 'power' | 'volume_up' | 'volume_down') => void;
 }
 
 export const ScreenCanvas: React.FC<ScreenCanvasProps> = ({
@@ -22,8 +28,15 @@ export const ScreenCanvas: React.FC<ScreenCanvasProps> = ({
   onRelativeTouchStart,
   onRelativeTouchMove,
   onRelativeTouchEnd,
+  onMouseDown,
+  onMouseUp,
+  onMouseClick,
+  onScroll,
+  hostType,
+  onAndroidNav,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isMouseDownRef = useRef<boolean>(false);
   
   // Track CSS bounds of rendered video image inside canvas
   const renderBoundsRef = useRef<{ offsetX: number; offsetY: number; width: number; height: number }>({
@@ -40,7 +53,7 @@ export const ScreenCanvas: React.FC<ScreenCanvasProps> = ({
     height: window.innerHeight,
   });
 
-  // Attach raw touch event listeners with passive: false to suppress browser pinch/zoom/scroll
+  // Attach raw touch and mouse event listeners
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -55,19 +68,24 @@ export const ScreenCanvas: React.FC<ScreenCanvasProps> = ({
     window.addEventListener('orientationchange', updateRect);
     document.addEventListener('fullscreenchange', updateRect);
 
+    const getNormCoords = (clientX: number, clientY: number) => {
+      const rect = canvasRectRef.current;
+      const touchX = clientX - rect.left;
+      const touchY = clientY - rect.top;
+      const bounds = renderBoundsRef.current;
+      const normX = Math.max(0, Math.min(1, (touchX - bounds.offsetX) / bounds.width));
+      const normY = Math.max(0, Math.min(1, (touchY - bounds.offsetY) / bounds.height));
+      return { normX, normY };
+    };
+
     const handleCanvasTouchStart = (e: TouchEvent) => {
       e.preventDefault();
       updateRect();
       if (inputMode === 'direct') {
         const touch = e.touches[0];
-        const rect = canvasRectRef.current;
-        const touchX = touch.clientX - rect.left;
-        const touchY = touch.clientY - rect.top;
-        const bounds = renderBoundsRef.current;
-
-        const normX = Math.max(0, Math.min(1, (touchX - bounds.offsetX) / bounds.width));
-        const normY = Math.max(0, Math.min(1, (touchY - bounds.offsetY) / bounds.height));
+        const { normX, normY } = getNormCoords(touch.clientX, touch.clientY);
         onDirectMove(normX, normY);
+        onMouseDown?.('left');
       } else {
         onRelativeTouchStart(e);
       }
@@ -77,13 +95,7 @@ export const ScreenCanvas: React.FC<ScreenCanvasProps> = ({
       e.preventDefault();
       if (inputMode === 'direct') {
         const touch = e.touches[0];
-        const rect = canvasRectRef.current;
-        const touchX = touch.clientX - rect.left;
-        const touchY = touch.clientY - rect.top;
-        const bounds = renderBoundsRef.current;
-
-        const normX = Math.max(0, Math.min(1, (touchX - bounds.offsetX) / bounds.width));
-        const normY = Math.max(0, Math.min(1, (touchY - bounds.offsetY) / bounds.height));
+        const { normX, normY } = getNormCoords(touch.clientX, touch.clientY);
         onDirectMove(normX, normY);
       } else {
         onRelativeTouchMove(e);
@@ -92,9 +104,56 @@ export const ScreenCanvas: React.FC<ScreenCanvasProps> = ({
 
     const handleCanvasTouchEnd = (e: TouchEvent) => {
       e.preventDefault();
-      if (inputMode === 'relative') {
+      if (inputMode === 'direct') {
+        onMouseUp?.('left');
+      } else {
         onRelativeTouchEnd(e);
       }
+    };
+
+    // Desktop Mouse Handlers
+    const handleMouseDown = (e: MouseEvent) => {
+      updateRect();
+      const { normX, normY } = getNormCoords(e.clientX, e.clientY);
+      onDirectMove(normX, normY);
+
+      if (e.button === 0) {
+        // Left button: press down
+        isMouseDownRef.current = true;
+        onMouseDown?.('left');
+      } else if (e.button === 2) {
+        // Right button
+        e.preventDefault();
+        if (hostType === 'android') {
+          onAndroidNav?.('back');
+        } else {
+          onMouseClick?.('right');
+        }
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isMouseDownRef.current) {
+        const { normX, normY } = getNormCoords(e.clientX, e.clientY);
+        onDirectMove(normX, normY);
+      }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button === 0 && isMouseDownRef.current) {
+        isMouseDownRef.current = false;
+        onMouseUp?.('left');
+      }
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -1 : 1;
+      onScroll?.(delta);
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
     };
 
     const opts = { passive: false };
@@ -102,6 +161,11 @@ export const ScreenCanvas: React.FC<ScreenCanvasProps> = ({
     canvas.addEventListener('touchmove', handleCanvasTouchMove, opts);
     canvas.addEventListener('touchend', handleCanvasTouchEnd, opts);
     canvas.addEventListener('touchcancel', handleCanvasTouchEnd, opts);
+    canvas.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('wheel', handleWheel, opts);
+    canvas.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
       window.removeEventListener('resize', updateRect);
@@ -111,8 +175,13 @@ export const ScreenCanvas: React.FC<ScreenCanvasProps> = ({
       canvas.removeEventListener('touchmove', handleCanvasTouchMove);
       canvas.removeEventListener('touchend', handleCanvasTouchEnd);
       canvas.removeEventListener('touchcancel', handleCanvasTouchEnd);
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      canvas.removeEventListener('wheel', handleWheel);
+      canvas.removeEventListener('contextmenu', handleContextMenu);
     };
-  }, [inputMode, onDirectMove, onRelativeTouchStart, onRelativeTouchMove, onRelativeTouchEnd]);
+  }, [inputMode, hostType, onDirectMove, onRelativeTouchStart, onRelativeTouchMove, onRelativeTouchEnd, onMouseDown, onMouseUp, onMouseClick, onScroll, onAndroidNav]);
 
   // RequestAnimationFrame high-speed render loop
   useEffect(() => {

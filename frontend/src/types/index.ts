@@ -15,6 +15,7 @@ export interface SystemInfo {
   status: string;
   lan_ip: string;
   port: number;
+  host_type?: 'windows' | 'android' | 'linux';
   screen: {
     width: number;
     height: number;

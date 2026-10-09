@@ -269,6 +269,13 @@ export function useTouchEngine({ serverHost, settings }: UseTouchEngineProps) {
     }
   }, [sendCommand]);
 
+  const sendAndroidNav = useCallback((action: 'back' | 'home' | 'recents' | 'power' | 'volume_up' | 'volume_down') => {
+    sendCommand({ type: 'android_nav', action });
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate(20); } catch (_) {}
+    }
+  }, [sendCommand]);
+
   return {
     isConnected,
     isDragging,
@@ -286,5 +293,6 @@ export function useTouchEngine({ serverHost, settings }: UseTouchEngineProps) {
     sendKeyDown,
     sendKeyUp,
     sendTextInput,
+    sendAndroidNav,
   };
 }

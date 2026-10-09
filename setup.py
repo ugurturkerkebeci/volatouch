@@ -6,10 +6,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="volatouch",
-    version="1.1.0",
+    version="1.2.0",
     author="Uğur Türker Kebeci",
     author_email="167927605+ugurturkerkebeci@users.noreply.github.com",
-    description="Zero-dependency ultra-low latency mobile air control & wireless trackpad for PC over Wi-Fi.",
+    description="Zero-dependency ultra-low latency bidirectional remote control for PC and Android phone over Wi-Fi.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/ugurturkerkebeci/volatouch",
@@ -28,6 +28,7 @@ setup(
         "Intended Audience :: End Users/Desktop",
         "License :: OSI Approved :: MIT License",
         "Operating System :: Microsoft :: Windows",
+        "Operating System :: POSIX :: Linux",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",

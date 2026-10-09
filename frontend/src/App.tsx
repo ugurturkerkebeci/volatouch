@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStreamSocket } from './hooks/useStreamSocket';
 import { useTouchEngine } from './hooks/useTouchEngine';
 import { ScreenCanvas } from './components/ScreenCanvas';
@@ -6,6 +6,7 @@ import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { SettingsModal } from './components/SettingsModal';
 import { FloatingActionWidget } from './components/FloatingActionWidget';
 import { FloatingSettingsWidget } from './components/FloatingSettingsWidget';
+import { AndroidNavBar } from './components/AndroidNavBar';
 import { StreamSettings, TouchpadSettings } from './types';
 import { Language } from './i18n';
 
@@ -21,6 +22,8 @@ export const App: React.FC = () => {
     setLang(newLang);
     localStorage.setItem('volatouch_lang', newLang);
   };
+
+  const [hostType, setHostType] = useState<'windows' | 'android' | 'linux'>('windows');
 
   const [streamSettings, setStreamSettings] = useState<StreamSettings>({
     quality: 60,
@@ -64,10 +67,69 @@ export const App: React.FC = () => {
     sendScroll,
     sendKeyTap,
     sendTextInput,
+    sendAndroidNav,
   } = useTouchEngine({
     serverHost,
     settings: touchSettings,
   });
+
+  // Detect server host type (Windows PC vs Android Phone)
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+    fetch(`${protocol}//${serverHost}/api/info`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.host_type) {
+          setHostType(data.host_type);
+        }
+      })
+      .catch(() => {});
+  }, [serverHost]);
+
+  // Physical desktop keyboard sync (typing on PC keyboard sends keystrokes/text to target)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || isKeyboardOpen) {
+        return;
+      }
+
+      if (e.key === 'Backspace') {
+        sendKeyTap('backspace');
+        e.preventDefault();
+      } else if (e.key === 'Enter') {
+        sendKeyTap('enter');
+        e.preventDefault();
+      } else if (e.key === 'Escape') {
+        if (hostType === 'android') {
+          sendAndroidNav('back');
+        } else {
+          sendKeyTap('esc');
+        }
+        e.preventDefault();
+      } else if (e.key === 'ArrowUp') {
+        sendKeyTap('up');
+        e.preventDefault();
+      } else if (e.key === 'ArrowDown') {
+        sendKeyTap('down');
+        e.preventDefault();
+      } else if (e.key === 'ArrowLeft') {
+        sendKeyTap('left');
+        e.preventDefault();
+      } else if (e.key === 'ArrowRight') {
+        sendKeyTap('right');
+        e.preventDefault();
+      } else if (e.key === 'Tab') {
+        sendKeyTap('tab');
+        e.preventDefault();
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        sendTextInput(e.key);
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hostType, isKeyboardOpen, sendKeyTap, sendTextInput, sendAndroidNav]);
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950 select-none touch-none text-slate-100">
@@ -78,11 +140,25 @@ export const App: React.FC = () => {
         fps={fps}
         inputMode={inputMode}
         scaleMode={scaleMode}
+        hostType={hostType}
         onDirectMove={(normX, normY) => sendMouseMoveAbs(normX, normY)}
         onRelativeTouchStart={handleTouchStart}
         onRelativeTouchMove={handleTouchMove}
         onRelativeTouchEnd={handleTouchEnd}
+        onMouseDown={sendMouseDown}
+        onMouseUp={sendMouseUp}
+        onMouseClick={sendMouseClick}
+        onScroll={sendScroll}
+        onAndroidNav={sendAndroidNav}
       />
+
+      {/* ANDROID SYSTEM NAVIGATION BAR (Shown when host is Android phone) */}
+      {hostType === 'android' && (
+        <AndroidNavBar
+          onNav={sendAndroidNav}
+          lang={lang}
+        />
+      )}
 
       {/* YÜZEN AYAR VE SİSTEM ÇUBUĞU (Bağımsız, taşınabilir ve küçültülebilir) */}
       <FloatingSettingsWidget
@@ -141,4 +217,3 @@ export const App: React.FC = () => {
 };
 
 export default App;
-

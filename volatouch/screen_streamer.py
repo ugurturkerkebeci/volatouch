@@ -15,18 +15,27 @@ try:
 except ImportError:
     from config import config
 
-user32 = ctypes.windll.user32
-gdi32 = ctypes.windll.gdi32
-gdiplus = ctypes.windll.gdiplus
-ole32 = ctypes.windll.ole32
-kernel32 = ctypes.windll.kernel32
+is_windows = hasattr(ctypes, "windll")
 
-# 64-bit safe signatures
-kernel32.GlobalLock.restype = ctypes.c_void_p
-kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
-kernel32.GlobalSize.restype = ctypes.c_size_t
-kernel32.GlobalSize.argtypes = [ctypes.c_void_p]
-kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+if is_windows:
+    user32 = ctypes.windll.user32
+    gdi32 = ctypes.windll.gdi32
+    gdiplus = ctypes.windll.gdiplus
+    ole32 = ctypes.windll.ole32
+    kernel32 = ctypes.windll.kernel32
+
+    # 64-bit safe signatures
+    kernel32.GlobalLock.restype = ctypes.c_void_p
+    kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
+    kernel32.GlobalSize.restype = ctypes.c_size_t
+    kernel32.GlobalSize.argtypes = [ctypes.c_void_p]
+    kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+else:
+    user32 = None
+    gdi32 = None
+    gdiplus = None
+    ole32 = None
+    kernel32 = None
 
 # GDI+ Structures
 class GdiplusStartupInput(ctypes.Structure):

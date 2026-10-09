@@ -15,8 +15,7 @@ import mimetypes
 from typing import Dict, Optional, Tuple, Set
 
 from volatouch.config import config, LOCAL_IP
-from volatouch.screen_streamer import ScreenStreamer
-from volatouch.input_controller import InputController
+from volatouch.platform import detect_platform
 
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
@@ -32,7 +31,8 @@ ALLOWED_COMMANDS = {
     "key_down",
     "key_up",
     "text_input",
-    "reset_inputs"
+    "reset_inputs",
+    "android_nav"
 }
 
 def compute_ws_accept(sec_key: str) -> str:
@@ -73,11 +73,21 @@ def is_same_network(client_ip_str: Optional[str], host_ip_str: str) -> bool:
 
 
 class VolatouchServer:
-    def __init__(self, host: str = "0.0.0.0", port: int = 8000):
+    def __init__(self, host: str = "0.0.0.0", port: int = 8000, mode: str = "auto"):
         self.host = host
         self.port = port
-        self.streamer = ScreenStreamer()
-        self.input_ctrl = InputController()
+        self.platform = detect_platform(mode)
+
+        if self.platform == "android":
+            from volatouch.android_streamer import AndroidScreenStreamer
+            from volatouch.android_input import AndroidInputController
+            self.streamer = AndroidScreenStreamer()
+            self.input_ctrl = AndroidInputController()
+        else:
+            from volatouch.screen_streamer import ScreenStreamer
+            from volatouch.input_controller import InputController
+            self.streamer = ScreenStreamer()
+            self.input_ctrl = InputController()
 
         self.active_devices: Dict[str, int] = {}
         self.devices_lock = asyncio.Lock()
@@ -192,6 +202,7 @@ class VolatouchServer:
                 "status": "online",
                 "lan_ip": LOCAL_IP,
                 "port": self.port,
+                "host_type": self.platform,
                 "screen": {
                     "width": self.streamer.screen_width,
                     "height": self.streamer.screen_height
@@ -421,6 +432,11 @@ class VolatouchServer:
                             text = str(cmd.get("text", ""))[:500]
                             self.input_ctrl.type_text(text)
 
+                        elif cmd_type == "android_nav":
+                            action = str(cmd.get("action", ""))[:20]
+                            if hasattr(self.input_ctrl, "android_nav"):
+                                self.input_ctrl.android_nav(action)
+
                         elif cmd_type == "reset_inputs":
                             self.input_ctrl.release_all()
 
@@ -442,8 +458,12 @@ class VolatouchServer:
         self._server = await asyncio.start_server(self.handle_connection, self.host, self.port)
 
         print("\n" + "=" * 65)
-        print("                 VOLATOUCH - AIR CONTROL SYSTEM")
+        if self.platform == "android":
+            print("      VOLATOUCH - ANDROID REMOTE CONTROL (Termux / Phone)")
+        else:
+            print("      VOLATOUCH - AIR CONTROL & TRACKPAD (PC Host)")
         print("=" * 65)
+        print(f"  [+] Mode: {'Android Phone (Control from PC)' if self.platform == 'android' else 'PC Host (Control from Mobile)'}")
         print(f"  [+] Local Network URL: http://{LOCAL_IP}:{self.port}")
         print("=" * 65)
         print("[*] Ready. Waiting for client connections...\n", flush=True)
@@ -455,6 +475,6 @@ class VolatouchServer:
             self.input_ctrl.release_all()
             self.streamer.stop()
 
-def run_server(host: str = "0.0.0.0", port: int = 8000):
-    server = VolatouchServer(host=host, port=port)
+def run_server(host: str = "0.0.0.0", port: int = 8000, mode: str = "auto"):
+    server = VolatouchServer(host=host, port=port, mode=mode)
     asyncio.run(server.run())

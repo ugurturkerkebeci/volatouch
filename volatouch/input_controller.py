@@ -7,7 +7,10 @@ from ctypes import wintypes
 import time
 from typing import Set, List, Optional
 
-user32 = ctypes.windll.user32
+if hasattr(ctypes, "windll"):
+    user32 = ctypes.windll.user32
+else:
+    user32 = None
 
 # Mouse flags
 MOUSEEVENTF_MOVE = 0x0001
