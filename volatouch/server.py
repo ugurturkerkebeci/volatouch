@@ -499,12 +499,12 @@ class VolatouchServer:
 
         print("\n" + "=" * 65)
         if self.platform == "android":
-            print("      VOLATOUCH - ANDROID REMOTE CONTROL (Termux / Phone)")
+            print("      VOLATOUCH - ANDROID PHONE CONTROL (Plug & Play)")
         else:
             print("      VOLATOUCH - AIR CONTROL & TRACKPAD (PC Host)")
         print("=" * 65)
-        print(f"  [+] Mode: {'Android Phone (Control from PC)' if self.platform == 'android' else 'PC Host (Control from Mobile)'}")
-        print(f"  [+] Local Network URL: http://{LOCAL_IP}:{self.port}")
+        print(f"  [+] Mode: {'Android Phone (Control Phone from PC Browser)' if self.platform == 'android' else 'PC Host (Control PC from Mobile Device)'}")
+        print(f"  [+] Open in Browser: http://localhost:{self.port} (or http://{LOCAL_IP}:{self.port})")
         print("=" * 65)
         print("[*] Ready. Waiting for client connections...\n", flush=True)
 

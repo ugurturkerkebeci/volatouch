@@ -179,13 +179,13 @@ export const App: React.FC = () => {
               </div>
               <p className="text-slate-300 mt-1 leading-relaxed">
                 {lang === 'tr'
-                  ? 'Android güvenlik politikası nedeniyle Termux\'ta ekran yakalamak ve dokunmatik kontrol için Root OLMADAN şu yöntemleri kullanabilirsiniz:'
-                  : 'Android security restricts background screencap. To stream without Root, use any of these methods:'}
+                  ? 'Telefonunuzu doğrudan bilgisayardan yönetmek için tek yapmanız gereken:'
+                  : 'To control your Android phone directly from this PC, simply:'}
               </p>
-              <div className="mt-2 p-2 bg-slate-950/80 rounded-lg font-mono text-[11px] text-amber-300 space-y-1.5 border border-slate-800">
-                <div>⚡ 1. Kablosuz Debug (Rootsuz): <code className="text-white font-bold">pkg install android-tools && adb connect localhost:&lt;port&gt;</code></div>
-                <div>⚡ 2. Shizuku (Rootsuz): <code className="text-white font-bold">rish -c volatouch</code></div>
-                <div>⚡ 3. PC'den USB/Wi-Fi: <code className="text-white font-bold">adb shell volatouch</code></div>
+              <div className="mt-2 p-2 bg-slate-950/80 rounded-lg text-[11px] text-amber-300 space-y-1.5 border border-slate-800">
+                <div>🔌 <b>1.</b> {lang === 'tr' ? 'Telefonunuzu USB kablosuyla bilgisayara bağlayın.' : 'Connect phone to PC with USB cable.'}</div>
+                <div>⚙️ <b>2.</b> {lang === 'tr' ? 'Ayarlar ➔ Geliştirici Seçenekleri ➔ USB Hata Ayıklama\'yı açın.' : 'Enable USB Debugging in Developer Options.'}</div>
+                <div>✅ <b>3.</b> {lang === 'tr' ? 'Telefonda çıkan "İzin ver" uyarısına [Tamam] deyin.' : 'Tap [Allow] on your phone screen when prompted.'}</div>
               </div>
             </div>
           </div>

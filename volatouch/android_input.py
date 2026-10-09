@@ -14,7 +14,8 @@ class AndroidInputController:
     """Translates input events into native Android /system/bin/input commands."""
 
     def __init__(self):
-        self.input_bin = self._find_binary("input")
+        self.input_bin = "input"
+        self.adb_bin: Optional[str] = None
         self.cmd_prefix: List[str] = self._detect_cmd_prefix()
         self.last_x: int = 540
         self.last_y: int = 1200
@@ -23,25 +24,31 @@ class AndroidInputController:
         self.down_time: float = 0.0
 
     def _detect_cmd_prefix(self) -> List[str]:
-        # 1. Test ADB (Zero-Root)
-        adb_bin = shutil.which("adb")
-        if adb_bin:
-            try:
-                r = subprocess.run([adb_bin, "shell", "echo ok"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2)
-                if r.returncode == 0 and b"ok" in r.stdout:
-                    return ["adb", "shell"]
-            except Exception:
-                pass
+        # 1. On Android local terminal (Termux / native)
+        local_input = self._find_binary("input")
+        if os.path.exists(local_input) and os.access(local_input, os.X_OK):
+            self.input_bin = local_input
+            return []
 
-        # 2. Test Shizuku (Zero-Root)
+        # 2. Shizuku (Zero-Root)
         rish_bin = shutil.which("rish")
         if rish_bin:
-            return ["rish", "-c"]
+            return [rish_bin, "-c"]
 
-        # 3. Test Root
+        # 3. Root
         for su_candidate in ["su", "/system/xbin/su", "/system/bin/su"]:
             if shutil.which(su_candidate) or os.path.exists(su_candidate):
                 return [su_candidate, "-c"]
+
+        # 4. ADB (PC or Local Wireless Debugging via ADBManager)
+        try:
+            from volatouch.adb_manager import ADBManager
+            adb = ADBManager.ensure_adb()
+            if adb:
+                self.adb_bin = adb
+                return [adb, "shell"]
+        except Exception:
+            pass
 
         return []
 
@@ -52,12 +59,13 @@ class AndroidInputController:
         w = shutil.which(name)
         if w:
             return w
-        return f"/system/bin/{name}"
+        return name
 
     def _exec_input(self, *args):
         try:
-            if self.cmd_prefix == ["adb", "shell"]:
-                cmd = ["adb", "shell", self.input_bin] + [str(a) for a in args]
+            adb = self.adb_bin or "adb"
+            if self.cmd_prefix and "shell" in self.cmd_prefix:
+                cmd = [adb, "shell", "input"] + [str(a) for a in args]
             elif self.cmd_prefix:
                 cmd_str = f"{self.input_bin} " + " ".join(str(a) for a in args)
                 cmd = self.cmd_prefix + [cmd_str]
