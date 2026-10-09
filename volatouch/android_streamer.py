@@ -1,6 +1,7 @@
 """
 Volatouch Android Screen Streamer
 Zero-Dependency Android framebuffer capture engine using /system/bin/screencap.
+Supports Direct execution, Root (su), and Shizuku (rish).
 """
 
 import os
@@ -11,7 +12,7 @@ import shutil
 import asyncio
 import threading
 import subprocess
-from typing import Optional, Set
+from typing import Optional, Set, List
 
 try:
     from volatouch.config import config
@@ -32,6 +33,10 @@ class AndroidScreenStreamer:
         self.fps = min(30, config.target_fps)  # Max 30 FPS for mobile screencap
 
         self.screencap_bin = self._find_binary("screencap")
+        self.cmd_prefix: List[str] = self._detect_cmd_prefix()
+        self.last_error: Optional[str] = None
+        self._warned_error = False
+
         self.screen_width = 1080
         self.screen_height = 2400
         self.screen_left = 0
@@ -48,11 +53,42 @@ class AndroidScreenStreamer:
             return w
         return f"/system/bin/{name}"
 
-    def _detect_screen_size(self):
-        # 1. Try `wm size`
-        wm_bin = self._find_binary("wm")
+    def _detect_cmd_prefix(self) -> List[str]:
+        # 1. Test direct execution
         try:
-            res = subprocess.run([wm_bin, "size"], capture_output=True, text=True, timeout=2)
+            r = subprocess.run([self.screencap_bin, "-p"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2)
+            if r.returncode == 0 and len(r.stdout) > 24:
+                return []
+        except Exception:
+            pass
+
+        # 2. Test 'su -c' (Root)
+        if shutil.which("su") or os.path.exists("/system/xbin/su") or os.path.exists("/system/bin/su"):
+            try:
+                r = subprocess.run(["su", "-c", f"{self.screencap_bin} -p"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
+                if r.returncode == 0 and len(r.stdout) > 24:
+                    print("[+] Android: Root ('su') privileges detected and active for screen capture.", flush=True)
+                    return ["su", "-c"]
+            except Exception:
+                pass
+
+        # 3. Test 'rish -c' (Shizuku)
+        if shutil.which("rish"):
+            try:
+                r = subprocess.run(["rish", "-c", f"{self.screencap_bin} -p"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
+                if r.returncode == 0 and len(r.stdout) > 24:
+                    print("[+] Android: Shizuku ('rish') privileges detected and active for screen capture.", flush=True)
+                    return ["rish", "-c"]
+            except Exception:
+                pass
+
+        return []
+
+    def _detect_screen_size(self):
+        wm_bin = self._find_binary("wm")
+        cmd = self.cmd_prefix + [f"{wm_bin} size"] if self.cmd_prefix else [wm_bin, "size"]
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
             if res.returncode == 0 and "Physical size:" in res.stdout:
                 part = res.stdout.split("Physical size:")[-1].strip().split("\n")[0].strip()
                 if "x" in part:
@@ -63,10 +99,10 @@ class AndroidScreenStreamer:
         except Exception:
             pass
 
-        # 2. Try dumpsys window displays
+        dumpsys_bin = self._find_binary("dumpsys")
+        cmd = self.cmd_prefix + [f"{dumpsys_bin} window displays"] if self.cmd_prefix else [dumpsys_bin, "window", "displays"]
         try:
-            dumpsys_bin = self._find_binary("dumpsys")
-            res = subprocess.run([dumpsys_bin, "window", "displays"], capture_output=True, text=True, timeout=2)
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
             if res.returncode == 0:
                 for line in res.stdout.splitlines():
                     if "cur=" in line and "app=" in line:
@@ -104,7 +140,8 @@ class AndroidScreenStreamer:
             "scale": self.scale,
             "fps": self.fps,
             "width": self.screen_width,
-            "height": self.screen_height
+            "height": self.screen_height,
+            "last_error": self.last_error
         }
 
     def start(self):
@@ -122,9 +159,14 @@ class AndroidScreenStreamer:
 
     def _capture_frame(self) -> Optional[bytes]:
         try:
-            cmd = [self.screencap_bin, "-p"]
-            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=3)
+            if self.cmd_prefix:
+                cmd = self.cmd_prefix + [f"{self.screencap_bin} -p"]
+            else:
+                cmd = [self.screencap_bin, "-p"]
+
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
             if proc.returncode == 0 and len(proc.stdout) > 24:
+                self.last_error = None
                 data = proc.stdout
                 # If PNG magic bytes \x89PNG\r\n\x1a\n
                 if data.startswith(b"\x89PNG"):
@@ -134,8 +176,21 @@ class AndroidScreenStreamer:
                         self.screen_width = w
                         self.screen_height = h
                 return data
-        except Exception:
-            pass
+            else:
+                err_msg = proc.stderr.decode("utf-8", errors="ignore").strip()
+                if not err_msg:
+                    err_msg = f"Exit code {proc.returncode}"
+                self.last_error = err_msg
+
+                if not self._warned_error:
+                    self._warned_error = True
+                    print(f"\n[!] Android Screencap Notice: {err_msg}", flush=True)
+                    print("[*] To capture Android screen in Termux, grant permissions using:", flush=True)
+                    print("    1) Root: run 'su' before 'volatouch', OR", flush=True)
+                    print("    2) Shizuku: run via 'rish', OR", flush=True)
+                    print("    3) Wireless Debugging: run inside 'adb shell'\n", flush=True)
+        except Exception as e:
+            self.last_error = str(e)
         return None
 
     def _capture_worker(self):

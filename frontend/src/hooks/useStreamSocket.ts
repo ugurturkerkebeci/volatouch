@@ -47,9 +47,12 @@ export function useStreamSocket({ serverHost, initialSettings }: UseStreamSocket
             const curLatency = Math.max(1, Math.round(Date.now() - sendTs));
             setLatency(curLatency);
 
-            // Slice remaining buffer containing raw JPEG bytes
-            const jpegBuffer = event.data.slice(8);
-            const blob = new Blob([jpegBuffer], { type: 'image/jpeg' });
+            // Slice remaining buffer containing raw image bytes (JPEG from PC or PNG from Android)
+            const imgBuffer = event.data.slice(8);
+            const uint8 = new Uint8Array(imgBuffer, 0, 4);
+            const isPng = uint8[0] === 0x89 && uint8[1] === 0x50 && uint8[2] === 0x4E && uint8[3] === 0x47;
+            const mime = isPng ? 'image/png' : 'image/jpeg';
+            const blob = new Blob([imgBuffer], { type: mime });
             const bitmap = await createImageBitmap(blob);
             
             // Swap bitmap ref and release previous GPU buffer

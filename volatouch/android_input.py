@@ -14,11 +14,19 @@ class AndroidInputController:
 
     def __init__(self):
         self.input_bin = self._find_binary("input")
+        self.cmd_prefix: List[str] = self._detect_cmd_prefix()
         self.last_x: int = 540
         self.last_y: int = 1200
         self.is_down: bool = False
         self.down_pos: Tuple[int, int] = (540, 1200)
         self.down_time: float = 0.0
+
+    def _detect_cmd_prefix(self) -> List[str]:
+        if shutil.which("su") or os.path.exists("/system/xbin/su") or os.path.exists("/system/bin/su"):
+            return ["su", "-c"]
+        if shutil.which("rish"):
+            return ["rish", "-c"]
+        return []
 
     def _find_binary(self, name: str) -> str:
         for p in [f"/system/bin/{name}", f"/system/xbin/{name}"]:
@@ -31,7 +39,11 @@ class AndroidInputController:
 
     def _exec_input(self, *args):
         try:
-            cmd = [self.input_bin] + [str(a) for a in args]
+            cmd_str = f"{self.input_bin} " + " ".join(str(a) for a in args)
+            if self.cmd_prefix:
+                cmd = self.cmd_prefix + [cmd_str]
+            else:
+                cmd = [self.input_bin] + [str(a) for a in args]
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3)
         except Exception:
             pass

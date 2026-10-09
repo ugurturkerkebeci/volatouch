@@ -38,10 +38,11 @@ export const App: React.FC = () => {
 
   // Input Mode: 'direct' (Tap navigates cursor directly to point) | 'relative' (Trackpad style)
   const [inputMode, setInputMode] = useState<'direct' | 'relative'>('direct');
-  // Scale Mode: 'fill' (Stretches to 100% of mobile display without black bars) | 'fit' (Aspect Ratio Contain)
-  const [scaleMode, setScaleMode] = useState<'fit' | 'fill'>('fill');
+  // Scale Mode: 'fit' for Android Phone (maintain phone aspect ratio), 'fill' for PC
+  const [scaleMode, setScaleMode] = useState<'fit' | 'fill'>('fit');
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showAndroidPermTip, setShowAndroidPermTip] = useState(true);
 
   // Binary stream socket
   const {
@@ -81,6 +82,11 @@ export const App: React.FC = () => {
       .then((data) => {
         if (data?.host_type) {
           setHostType(data.host_type);
+          if (data.host_type === 'android') {
+            setScaleMode('fit');
+          } else {
+            setScaleMode('fill');
+          }
         }
       })
       .catch(() => {});
@@ -152,7 +158,41 @@ export const App: React.FC = () => {
         onAndroidNav={sendAndroidNav}
       />
 
-      {/* ANDROID SYSTEM NAVIGATION BAR (Shown when host is Android phone) */}
+      {/* ANDROID SCREEN CAPTURE PERMISSION HELPER OVERLAY */}
+      {hostType === 'android' && streamStatus === 'connected' && fps === 0 && showAndroidPermTip && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 max-w-md w-11/12 p-4 bg-slate-900/95 border border-amber-500/60 rounded-2xl shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-start space-x-3">
+            <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+              ⚠️
+            </div>
+            <div className="flex-1 text-xs sm:text-sm">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-slate-100">
+                  {lang === 'tr' ? 'Android Ekran İzni Gerekli' : 'Android Screen Permission Required'}
+                </h4>
+                <button
+                  onClick={() => setShowAndroidPermTip(false)}
+                  className="text-slate-400 hover:text-slate-200 text-xs px-2 py-0.5 rounded bg-slate-800"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-slate-300 mt-1 leading-relaxed">
+                {lang === 'tr'
+                  ? 'Termux ekran görüntüsü yakalayamıyor (0 fps). Ekran görüntüsü ve dokunmatik kontrol izni için Termux\'ta şunlardan birini kullanın:'
+                  : 'Termux could not capture display (0 fps). Android requires elevated privileges for screencap and input:'}
+              </p>
+              <div className="mt-2 p-2 bg-slate-950/80 rounded-lg font-mono text-[11px] text-amber-300 space-y-1 border border-slate-800">
+                <div>1. Root: <code className="text-white font-bold">su</code> ardından <code className="text-indigo-400">volatouch</code></div>
+                <div>2. Shizuku: <code className="text-white font-bold">rish -c volatouch</code></div>
+                <div>3. ADB / Kablosuz: <code className="text-white font-bold">adb shell volatouch</code></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ANDROID SYSTEM NAVIGATION BAR (Shown cleanly when host is Android phone) */}
       {hostType === 'android' && (
         <AndroidNavBar
           onNav={sendAndroidNav}
@@ -173,17 +213,19 @@ export const App: React.FC = () => {
         lang={lang}
       />
 
-      {/* YÜZEN TIKLAMA VE KLAVYE ADASI (Sol Tık, Sağ Tık, Hold, Scroll, Klavye) */}
-      <FloatingActionWidget
-        onLeftClick={() => sendMouseClick('left')}
-        onRightClick={() => sendMouseClick('right')}
-        onMouseDown={() => sendMouseDown('left')}
-        onMouseUp={() => sendMouseUp('left')}
-        onScroll={(dy) => sendScroll(dy)}
-        onToggleKeyboard={() => setIsKeyboardOpen((prev) => !prev)}
-        isKeyboardOpen={isKeyboardOpen}
-        lang={lang}
-      />
+      {/* YÜZEN TIKLAMA VE KLAVYE ADASI (Yalnızca Telefondan PC kontrol edilirken gösterilir) */}
+      {hostType !== 'android' && (
+        <FloatingActionWidget
+          onLeftClick={() => sendMouseClick('left')}
+          onRightClick={() => sendMouseClick('right')}
+          onMouseDown={() => sendMouseDown('left')}
+          onMouseUp={() => sendMouseUp('left')}
+          onScroll={(dy) => sendScroll(dy)}
+          onToggleKeyboard={() => setIsKeyboardOpen((prev) => !prev)}
+          isKeyboardOpen={isKeyboardOpen}
+          lang={lang}
+        />
+      )}
 
       {/* DAHİLİ TAM QWERTY SANAL KLAVYE */}
       <VirtualKeyboard
