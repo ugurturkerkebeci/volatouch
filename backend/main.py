@@ -42,7 +42,7 @@ async def register_device_connect(client_ip: str):
         active_device_sockets[client_ip] = prev_count + 1
         if prev_count == 0:
             total_unique = len(active_device_sockets)
-            print(f"[+] Cihaz baglandi: {client_ip} | Aktif Bagli Cihaz: {total_unique}", flush=True)
+            print(f"[+] Device connected: {client_ip} | Active devices: {total_unique}", flush=True)
 
 async def register_device_disconnect(client_ip: str):
     async with devices_lock:
@@ -51,7 +51,7 @@ async def register_device_disconnect(client_ip: str):
             if active_device_sockets[client_ip] <= 0:
                 del active_device_sockets[client_ip]
                 total_unique = len(active_device_sockets)
-                print(f"[-] Cihaz ayrildi: {client_ip} | Aktif Bagli Cihaz: {total_unique}", flush=True)
+                print(f"[-] Device disconnected: {client_ip} | Active devices: {total_unique}", flush=True)
 
 # Allowed input commands whitelist
 ALLOWED_COMMANDS = {
@@ -100,9 +100,9 @@ async def lifespan(app: FastAPI):
     print("\n" + "="*65)
     print("                 VOLATOUCH - AIR CONTROL SYSTEM")
     print("="*65)
-    print(f"  [+] Yerel Ag Baglanti Linki: http://{LOCAL_IP}:{config.port}")
+    print(f"  [+] Local Network URL: http://{LOCAL_IP}:{config.port}")
     print("="*65)
-    print("[*] Sistem hazir, cihaz baglantisi bekleniyor...\n", flush=True)
+    print("[*] Ready. Waiting for client connections...\n", flush=True)
     yield
     input_ctrl.release_all()
     streamer.stop()
@@ -128,7 +128,7 @@ async def security_headers_and_network_middleware(request: Request, call_next):
             status_code=403,
             content={
                 "error": "Forbidden",
-                "message": f"Erisim Engellendi: Bu bilgisayari kontrol etmek icin ayni Wi-Fi agina ({LOCAL_IP}) bagli olmalisiniz."
+                "message": f"Access Denied: You must be connected to the same local Wi-Fi subnet ({LOCAL_IP}) to control this PC."
             }
         )
 

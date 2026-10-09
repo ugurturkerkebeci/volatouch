@@ -1,17 +1,34 @@
 import struct
-import cv2
+import io
 import mss
-import numpy as np
 import threading
 import time
 import asyncio
 import logging
 from typing import Optional, Set
 import ctypes
+
 try:
     from volatouch.config import config
 except ImportError:
     from config import config
+
+# Dual engine: try OpenCV (accelerated C++), fallback to Pillow (ultra-lightweight, 3MB)
+try:
+    import cv2
+    import numpy as np
+    HAS_OPENCV = True
+except ImportError:
+    HAS_OPENCV = False
+
+try:
+    from PIL import Image, ImageDraw
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
+if not HAS_OPENCV and not HAS_PIL:
+    raise ImportError("Volatouch requires either 'Pillow' or 'opencv-python' for image processing. Please run: pip install Pillow")
 
 class POINT(ctypes.Structure):
     _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
@@ -126,56 +143,85 @@ class ScreenStreamer:
             while self._running:
                 loop_start = time.perf_counter()
 
-                try:
-                    # 1. Grab raw BGRA buffer
                     raw_shot = sct.grab(monitor)
-
-                    # 2. Reshape into BGRA numpy buffer without any unnecessary color conversions
-                    bgra = np.frombuffer(raw_shot.raw, dtype=np.uint8).reshape((raw_shot.height, raw_shot.width, 4))
-
-                    # 3. Dynamic scaling with INTER_NEAREST (<1ms)
                     current_scale = self._scale
-                    if current_scale < 0.99:
-                        new_w = max(16, int(raw_shot.width * current_scale))
-                        new_h = max(16, int(raw_shot.height * current_scale))
-                        bgra = cv2.resize(bgra, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
+                    frame_bytes = None
 
-                    # 4. Hardware cursor overlay
-                    try:
-                        pt = POINT()
-                        if ctypes.windll.user32.GetCursorPos(ctypes.byref(pt)):
-                            cx = pt.x - monitor["left"]
-                            cy = pt.y - monitor["top"]
-                            if 0 <= cx < raw_shot.width and 0 <= cy < raw_shot.height:
-                                scx = int(cx * current_scale)
-                                scy = int(cy * current_scale)
-                                arrow = np.array([
-                                    [scx, scy],
-                                    [scx, scy + 19],
-                                    [scx + 5, scy + 14],
-                                    [scx + 9, scy + 22],
-                                    [scx + 12, scy + 20],
-                                    [scx + 8, scy + 13],
-                                    [scx + 15, scy + 13]
-                                ], dtype=np.int32)
-                                # Draw black border and white arrow on BGRA
-                                cv2.fillPoly(bgra, [arrow], (255, 255, 255, 255))
-                                cv2.polylines(bgra, [arrow], isClosed=True, color=(0, 0, 0, 255), thickness=2)
-                    except Exception:
-                        pass
+                    if HAS_OPENCV:
+                        # Accelerated OpenCV path
+                        bgra = np.frombuffer(raw_shot.raw, dtype=np.uint8).reshape((raw_shot.height, raw_shot.width, 4))
+                        if current_scale < 0.99:
+                            new_w = max(16, int(raw_shot.width * current_scale))
+                            new_h = max(16, int(raw_shot.height * current_scale))
+                            bgra = cv2.resize(bgra, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
 
-                    # 5. Direct BGRA JPEG compression with IMWRITE_JPEG_OPTIMIZE=0
-                    encode_params = [
-                        int(cv2.IMWRITE_JPEG_QUALITY), int(self._quality),
-                        int(cv2.IMWRITE_JPEG_OPTIMIZE), 0
-                    ]
-                    success, encoded = cv2.imencode('.jpg', bgra, encode_params)
+                        # Hardware cursor overlay
+                        try:
+                            pt = POINT()
+                            if ctypes.windll.user32.GetCursorPos(ctypes.byref(pt)):
+                                cx = pt.x - monitor["left"]
+                                cy = pt.y - monitor["top"]
+                                if 0 <= cx < raw_shot.width and 0 <= cy < raw_shot.height:
+                                    scx = int(cx * current_scale)
+                                    scy = int(cy * current_scale)
+                                    arrow = np.array([
+                                        [scx, scy],
+                                        [scx, scy + 19],
+                                        [scx + 5, scy + 14],
+                                        [scx + 9, scy + 22],
+                                        [scx + 12, scy + 20],
+                                        [scx + 8, scy + 13],
+                                        [scx + 15, scy + 13]
+                                    ], dtype=np.int32)
+                                    cv2.fillPoly(bgra, [arrow], (255, 255, 255, 255))
+                                    cv2.polylines(bgra, [arrow], isClosed=True, color=(0, 0, 0, 255), thickness=2)
+                        except Exception:
+                            pass
 
-                    if success:
+                        encode_params = [
+                            int(cv2.IMWRITE_JPEG_QUALITY), int(self._quality),
+                            int(cv2.IMWRITE_JPEG_OPTIMIZE), 0
+                        ]
+                        success, encoded = cv2.imencode('.jpg', bgra, encode_params)
+                        if success:
+                            frame_bytes = encoded.tobytes()
+                    else:
+                        # Ultra-lightweight Pillow path (zero numpy, zero opencv, <5MB footprint!)
+                        img = Image.frombuffer('RGB', (raw_shot.width, raw_shot.height), raw_shot.raw, 'raw', 'BGRX')
+                        if current_scale < 0.99:
+                            new_w = max(16, int(raw_shot.width * current_scale))
+                            new_h = max(16, int(raw_shot.height * current_scale))
+                            img = img.resize((new_w, new_h), Image.Resampling.NEAREST)
+
+                        try:
+                            pt = POINT()
+                            if ctypes.windll.user32.GetCursorPos(ctypes.byref(pt)):
+                                cx = pt.x - monitor["left"]
+                                cy = pt.y - monitor["top"]
+                                if 0 <= cx < raw_shot.width and 0 <= cy < raw_shot.height:
+                                    scx = int(cx * current_scale)
+                                    scy = int(cy * current_scale)
+                                    arrow = [
+                                        (scx, scy),
+                                        (scx, scy + 19),
+                                        (scx + 5, scy + 14),
+                                        (scx + 9, scy + 22),
+                                        (scx + 12, scy + 20),
+                                        (scx + 8, scy + 13),
+                                        (scx + 15, scy + 13)
+                                    ]
+                                    draw = ImageDraw.Draw(img)
+                                    draw.polygon(arrow, fill="white", outline="black")
+                        except Exception:
+                            pass
+
+                        buf = io.BytesIO()
+                        img.save(buf, format='JPEG', quality=self._quality)
+                        frame_bytes = buf.getvalue()
+
+                    if frame_bytes:
                         timestamp_header = struct.pack('>d', time.time() * 1000)
-                        packet_bytes = timestamp_header + encoded.tobytes()
-
-                        # Dispatch immediately to all waiting WebSocket clients with ZERO delay
+                        packet_bytes = timestamp_header + frame_bytes
                         self._dispatch_frame(packet_bytes)
 
                         # Calculate FPS
